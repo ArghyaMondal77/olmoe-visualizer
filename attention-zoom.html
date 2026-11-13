@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Micro-Math // Attention Core, Masking & Projection</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #050507;
+      --core-green: #10b981;
+      --attn-cyan: #0ea5e9;
+      --moe-purple: #8b5cf6;
+      --val-orange: #f59e0b;
+      --alert-red: #f43f5e;
+      --text-main: #f8fafc;
+      --text-dim: #475569;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif; background-color: var(--bg-void); color: var(--text-main);
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
+        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding-bottom: 60px;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      width: 100%; height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between;
+      align-items: center; backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 200;
+    }
+    .btn-back {
+      background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 8px 18px;
+      font-size: 0.7rem; cursor: pointer; border-radius: 4px; text-transform: uppercase;
+      letter-spacing: 2px; transition: all 0.3s; font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    }
+    .btn-back:hover { color: #fff; border-color: var(--attn-cyan); box-shadow: 0 0 15px rgba(14, 165, 233, 0.2); }
+
+    .content-wrapper { width: 100%; max-width: 1100px; padding: 40px 20px; display: flex; flex-direction: column; gap: 30px; }
+
+    /* HEADER & FORMULA */
+    .math-header { text-align: center; margin-bottom: 10px; }
+    .math-title { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; color: var(--attn-cyan); letter-spacing: 2px; margin-bottom: 15px; }
+    
+    .formula-box {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);
+      padding: 20px 40px; border-radius: 8px; display: inline-flex; flex-direction: column; gap: 10px;
+      font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; color: #cbd5e1;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5); letter-spacing: 1px;
+    }
+    .fm-part { transition: all 0.3s; padding: 2px 6px; border-radius: 4px; }
+    .fm-hl { background: rgba(255,255,255,0.1); color: #fff; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+    .fm-q { color: var(--attn-cyan); } .fm-k { color: var(--moe-purple); } .fm-v { color: var(--val-orange); }
+    .fm-mask { color: var(--alert-red); font-weight: bold; }
+    .fm-wo { color: var(--core-green); font-weight: bold; }
+
+    /* ANIMATION STAGE */
+    .stage {
+      background: linear-gradient(180deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.9) 100%);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 40px; min-height: 550px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; justify-content: center;
+      position: relative;
+    }
+
+    /* ========================================= */
+    /* PHASE 1: THE HEATMAP GRID                 */
+    /* ========================================= */
+    .heatmap-wrapper {
+      display: flex; flex-direction: column; align-items: center; width: 100%;
+      transition: opacity 0.5s; opacity: 1;
+    }
+    .heatmap-wrapper.hidden { opacity: 0; pointer-events: none; position: absolute; }
+
+    .heatmap-container {
+      display: grid; grid-template-columns: 80px repeat(5, 90px);
+      grid-template-rows: 40px repeat(5, 60px); gap: 4px; margin-bottom: 30px;
+      position: relative;
+    }
+
+    .cell {
+      display: flex; justify-content: center; align-items: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700;
+      border-radius: 4px; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .header-k { background: rgba(139, 92, 246, 0.1); color: var(--moe-purple); border: 1px solid rgba(139, 92, 246, 0.3); font-size: 0.75rem; }
+    .header-q { background: rgba(14, 165, 233, 0.1); color: var(--attn-cyan); border: 1px solid rgba(14, 165, 233, 0.3); font-size: 0.75rem; }
+    .corner { background: transparent; }
+
+    .data-cell { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); color: #94a3b8; position: relative; overflow: hidden; }
+    .data-cell.masked { background: rgba(15, 15, 20, 0.8); border: 1px dashed rgba(244, 63, 94, 0.3); color: var(--alert-red); box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
+    
+    .heat-fill { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: var(--core-green); opacity: 0; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); z-index: 1; }
+    .data-val { position: relative; z-index: 2; transition: color 0.3s; }
+
+    /* ========================================= */
+    /* PHASE 2: CONCATENATION & W_O PROJECTION   */
+    /* ========================================= */
+    .projection-wrapper {
+      display: flex; flex-direction: column; align-items: center; width: 100%;
+      opacity: 0; pointer-events: none; position: absolute; transition: opacity 0.5s;
+    }
+    .projection-wrapper.active { opacity: 1; pointer-events: auto; position: relative; }
+
+    .heads-row { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; transition: gap 1.5s cubic-bezier(0.25, 1, 0.5, 1); width: 100%; }
+    .heads-row.merged { gap: 0; }
+    
+    .head-block {
+      background: rgba(14, 165, 233, 0.15); border: 1px solid var(--attn-cyan); padding: 15px 0;
+      border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #fff;
+      text-align: center; transition: all 1.5s cubic-bezier(0.25, 1, 0.5, 1); flex: 1; max-width: 120px;
+    }
+    .heads-row.merged .head-block { border-radius: 0; border-right: none; background: rgba(14, 165, 233, 0.25); box-shadow: 0 0 15px rgba(14, 165, 233, 0.4); border-top: 1px solid var(--attn-cyan); border-bottom: 1px solid var(--attn-cyan); }
+    .heads-row.merged .head-block:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; border-left: 1px solid var(--attn-cyan); }
+    .heads-row.merged .head-block:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-right: 1px solid var(--attn-cyan); }
+
+    .math-operator { font-family: 'JetBrains Mono', monospace; font-size: 2rem; color: #64748b; margin: 15px 0; opacity: 0; transform: translateY(-10px); transition: all 0.5s 0.8s; }
+    .math-operator.active { opacity: 1; transform: translateY(0); color: var(--core-green); text-shadow: 0 0 15px var(--core-green); }
+
+    .wo-matrix {
+      background: rgba(16, 185, 129, 0.05); border: 2px solid rgba(16, 185, 129, 0.4); padding: 20px 40px;
+      border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #fff;
+      text-align: center; box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+      opacity: 0; transform: translateY(-20px); transition: all 0.6s 1s; width: 60%;
+    }
+    .wo-matrix.active { opacity: 1; transform: translateY(0); box-shadow: inset 0 0 30px rgba(16, 185, 129, 0.2), 0 0 30px rgba(16, 185, 129, 0.15); }
+    
+    .final-out {
+      background: rgba(255, 255, 255, 0.05); border: 1px solid #fff; padding: 15px 40px;
+      border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #fff;
+      opacity: 0; transform: translateY(-20px); transition: all 0.6s 1.8s; font-weight: bold; letter-spacing: 1px;
+    }
+    .final-out.active { opacity: 1; transform: translateY(0); background: #fff; color: #000; box-shadow: 0 0 40px rgba(255,255,255,0.6); }
+
+    .shape-lbl { font-size: 0.75rem; color: var(--text-dim); margin-top: 5px; font-weight: normal; letter-spacing: 0; }
+
+    /* CONTROLS */
+    .controls { display: flex; gap: 15px; margin-top: 20px; align-items: center; justify-content: center; width: 100%; }
+    .btn-step {
+      background: var(--attn-cyan); color: #000; border: none; padding: 12px 24px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+      text-transform: uppercase; transition: all 0.3s; box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    }
+    .btn-step:hover { box-shadow: 0 0 30px rgba(14, 165, 233, 0.6); transform: translateY(-2px); }
+    .status-text { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #94a3b8; width: 550px; text-align: left; line-height: 1.6; }
+
+    /* EDITORIAL SECTION */
+    .editorial-section { width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px; }
+    .ed-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; }
+    @media (max-width: 900px) { .ed-grid { grid-template-columns: 1fr; } }
+    .ed-col h3 { font-family: 'JetBrains Mono', monospace; font-size: 1rem; color: #fff; margin-bottom: 15px; letter-spacing: 1px; border-bottom: 1px solid #334; padding-bottom: 8px;}
+    .ed-col p { font-size: 0.85rem; color: #94a3b8; line-height: 1.8; font-weight: 300; margin-bottom: 15px; }
+    .ed-col span.hl { color: #fff; font-weight: 600; }
+
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <button class="btn-back" onclick="window.close()">← Macro Topology</button>
+    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
+      MICRO-MATH <span style="color:#fff; font-weight:600;">//</span> CAUSAL ATTENTION & W_O
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    
+    <div class="math-header">
+      <div class="math-title">MHA: Scaled Dot-Product & Final Projection</div>
+      <div class="formula-box">
+        <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Phase 1: Head Computation (Repeated 16x)</div>
+        <div>head<sub>i</sub> = 
+          <span class="fm-part" id="fm-soft">softmax(</span> 
+          <span class="fm-part" id="fm-qk">
+            (<span class="fm-q">Q<sub>i</sub></span>·<span class="fm-k">K<sub>i</sub></span><sup>T</sup>) 
+            <span class="fm-part" id="fm-scale">/ √<span style="font-size: 1rem;">d<sub>k</sub></span></span> 
+            <span class="fm-part" id="fm-mask"><span class="fm-mask">+ M</span></span>
+          </span> 
+          <span class="fm-part" id="fm-soft-end">)</span> 
+          <span class="fm-part" id="fm-v"><span class="fm-v">V<sub>i</sub></span></span>
+        </div>
+        <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase; margin: 15px 0 5px 0;">Phase 2: Head Concatenation & Output</div>
+        <div>MHA_Out = <span class="fm-part" id="fm-concat">Concat(head<sub>0</sub> ... head<sub>15</sub>)</span> · <span class="fm-part" id="fm-wo"><span class="fm-wo">W<sub>O</sub></span></span></div>
+      </div>
+    </div>
+
+    <!-- ANIMATION STAGE -->
+    <div class="stage">
+      
+      <!-- PHASE 1: HEATMAP -->
+      <div class="heatmap-wrapper" id="heatWrapper">
+        <div class="heatmap-container" id="heatmap">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+
+      <!-- PHASE 2: CONCAT & W_O -->
+      <div class="projection-wrapper" id="projWrapper">
+        
+        <div style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px; text-transform: uppercase;">1. Concatenate 16 Independent Heads</div>
+        
+        <div class="heads-row" id="headsRow">
+          <!-- Symbolically showing a few heads to represent the 16 -->
+          <div class="head-block">Head 0<div class="shape-lbl">Dim: 128</div></div>
+          <div class="head-block">Head 1<div class="shape-lbl">Dim: 128</div></div>
+          <div class="head-block" style="background: transparent; border: none; color: #475569;">...</div>
+          <div class="head-block">Head 14<div class="shape-lbl">Dim: 128</div></div>
+          <div class="head-block">Head 15<div class="shape-lbl">Dim: 128</div></div>
+        </div>
+        
+        <div style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--attn-cyan); margin-top: 5px; opacity: 0; transition: opacity 0.5s 1s;" id="concatShapeLbl">Resulting Shape: [1, 2048]</div>
+
+        <div class="math-operator" id="opMul">×</div>
+
+        <div class="wo-matrix" id="woMatrix">
+          Output Projection Matrix (W<sub>O</sub>)
+          <div class="shape-lbl" style="color: #94a3b8;">Shape: [2048, 2048]</div>
+        </div>
+
+        <div class="math-operator" id="opEq">=</div>
+
+        <div class="final-out" id="finalOut">
+          Final Attention Vector
+          <div class="shape-lbl" style="color: #64748b;">Shape: [1, 2048]</div>
+        </div>
+
+      </div>
+
+      <div class="controls">
+        <button class="btn-step" id="btnNext" onclick="triggerNext()">Scale by √d ➔</button>
+        <div class="status-text" id="statusText">
+          <b>Step 1: The Raw Dot Product.</b> Multiplying the Query and Key matrices yields huge, high-variance numbers. Row 1 ("capital") strongly resonates with Col 3 ("France").
+        </div>
+      </div>
+
+    </div>
+
+    <!-- EDITORIAL -->
+    <div class="editorial-section">
+      <div class="ed-grid">
+        <div>
+          <h3 style="color: var(--attn-cyan);">THE NUMERATOR Q . K^T & TEMPERATURE</h3>
+          <p>Every word (Query) asks every other word (Key): <i>"How relevant are you to me?"</i> Because OLMoE operates in 128 dimensions per head, the dot product produces massively large numbers.</p>
+          <p>We divide by √128 (approx 11.3). This <span class="hl">Temperature Scaling</span> squashes the variance down to a stable range to prevent the Softmax from peaking at 99.99% and killing gradients.</p>
+        </div>
+        <div>
+          <h3 style="color: var(--alert-red);">THE CAUSAL MASK ( M)</h3>
+          <p>Decoder-only models generate text autoregressively. During parallel training, a word <span class="hl">cannot be allowed to look at words that come after it</span>.</p>
+          <p>We enforce this by adding -∞ to the upper triangle of the matrix. The Softmax translates e^-∞ to exactly 0.000%, guaranteeing future words are completely ignored.</p>
+        </div>
+        <div>
+          <h3 style="color: var(--val-orange);">THE VALUE EXTRACTION (V)</h3>
+          <p>The resulting probabilities are multiplied by the <span class="hl">Value V</span> matrix. If "capital" pays 85% of its attention to "France", it absorbs 85% of the semantic meaning from the "France" Value vector.</p>
+          <p>This process happens simultaneously across all 16 heads. Each head extracts a different 128-dimensional perspective (e.g., Head 0 extracts grammar, Head 1 extracts geography).</p>
+        </div>
+        <div>
+          <h3 style="color: var(--core-green);">CONCATENATION & W_O PROJECTION</h3>
+          <p>After all 16 heads compute their 128-dimensional Value outputs, they are <span class="hl">concatenated</span> back together side-by-side 16 times 128 = 2048.</p>
+          <p>Finally, this rejoined 2048D vector is multiplied by the Output Projection Matrix W_O. This matrix mixes the insights from all 16 isolated heads back together, producing the final attention payload that will be added to the residual spine.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 1. Data Setup
+    const tokens = ["The", "capital", "of", "France", "is"];
+    
+    // Raw Mock Q*K^T logits (Notice "capital" relates to "France", "is" relates to "capital" & "France")
+    const rawMatrix = [
+      [ 12.1,  -4.5,   1.2,   5.8, -10.2], 
+      [ -8.4,  35.2,   8.1,  65.8,   2.5], 
+      [  2.2,  15.4,   7.8,  21.2,  -3.4], 
+      [  4.5,  52.1,  16.8,  38.4,  11.2], 
+      [-11.2,  42.8,   4.5,  55.2,  18.5]  
+    ];
+
+    const d_k = 128;
+    const scaleFactor = Math.sqrt(d_k); 
+
+    // 2. Compute Accurate Scaled, Masked, and Softmax Matrices
+    const scaledMatrix = rawMatrix.map(row => row.map(val => val / scaleFactor));
+    const maskedMatrix = scaledMatrix.map((row, r) => row.map((val, c) => c > r ? -Infinity : val));
+    
+    const softmaxMatrix = maskedMatrix.map(row => {
+      const validVals = row.filter(v => v !== -Infinity);
+      const maxVal = validVals.length > 0 ? Math.max(...validVals) : 0;
+      const exps = row.map(val => val === -Infinity ? 0 : Math.exp(val - maxVal));
+      const sumExps = exps.reduce((a, b) => a + b, 0);
+      return exps.map(val => sumExps === 0 ? 0 : val / sumExps);
+    });
+
+    // 3. DOM Construction for Heatmap
+    const heatmap = document.getElementById('heatmap');
+    
+    function buildGrid() {
+      heatmap.innerHTML += `<div class="cell corner"></div>`;
+      tokens.forEach(t => heatmap.innerHTML += `<div class="cell header-k">K: ${t}</div>`);
+
+      for (let r = 0; r < 5; r++) {
+        heatmap.innerHTML += `<div class="cell header-q">Q: ${tokens[r]}</div>`;
+        for (let c = 0; c < 5; c++) {
+          heatmap.innerHTML += `
+            <div class="cell data-cell" id="cell-${r}-${c}">
+              <div class="heat-fill" id="fill-${r}-${c}"></div>
+              <div class="data-val" id="val-${r}-${c}">${rawMatrix[r][c].toFixed(1)}</div>
+            </div>
+          `;
+        }
+      }
+    }
+    buildGrid();
+
+    // 4. State Machine Animation
+    let step = 0;
+    const btnNext = document.getElementById('btnNext');
+    const statusText = document.getElementById('statusText');
+    
+    const fmQK = document.getElementById('fm-qk');
+    const fmScale = document.getElementById('fm-scale');
+    const fmMask = document.getElementById('fm-mask');
+    const fmSoft = document.getElementById('fm-soft');
+    const fmSoftEnd = document.getElementById('fm-soft-end');
+    const fmV = document.getElementById('fm-v');
+    const fmConcat = document.getElementById('fm-concat');
+    const fmWo = document.getElementById('fm-wo');
+
+    const heatWrapper = document.getElementById('heatWrapper');
+    const projWrapper = document.getElementById('projWrapper');
+
+    function triggerNext() {
+      if (step === 0) {
+        // STEP 1: Scale
+        fmQK.classList.remove('fm-hl');
+        fmScale.classList.add('fm-hl');
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            document.getElementById(`val-${r}-${c}`).innerText = scaledMatrix[r][c].toFixed(2);
+          }
+        }
+        statusText.innerHTML = "<b>Step 2: Temperature Scaling.</b> Divide by $\\sqrt{128}$ (approx 11.3). The variance is squashed down to a stable range, preserving gradients.";
+        btnNext.innerText = "Apply Mask (+M) ➔";
+        step = 1;
+      }
+      else if (step === 1) {
+        // STEP 2: Causal Mask
+        fmScale.classList.remove('fm-hl');
+        fmMask.classList.add('fm-hl');
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            if (c > r) {
+              document.getElementById(`cell-${r}-${c}`).classList.add('masked');
+              document.getElementById(`val-${r}-${c}`).innerText = "-∞";
+            }
+          }
+        }
+        statusText.innerHTML = "<b>Step 3: Causal Masking.</b> We inject <b>-Infinity</b> into the upper triangle. Row 1 ('capital') is completely blocked from seeing Col 3 ('France').";
+        btnNext.innerText = "Apply Softmax ➔";
+        step = 2;
+      }
+      else if (step === 2) {
+        // STEP 3: Softmax Heatmap
+        fmMask.classList.remove('fm-hl');
+        fmSoft.classList.add('fm-hl');
+        fmSoftEnd.classList.add('fm-hl');
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            const prob = softmaxMatrix[r][c];
+            const valEl = document.getElementById(`val-${r}-${c}`);
+            const fillEl = document.getElementById(`fill-${r}-${c}`);
+            const cellEl = document.getElementById(`cell-${r}-${c}`);
+            
+            valEl.innerText = prob.toFixed(3);
+            
+            if (c > r) {
+              fillEl.style.height = `0%`;
+              valEl.style.color = '#334155'; 
+              cellEl.classList.remove('masked'); 
+            } else {
+              fillEl.style.height = `${prob * 100}%`;
+              fillEl.style.opacity = '1';
+              if (prob > 0.5) {
+                fillEl.style.background = 'var(--core-green)';
+                fillEl.style.boxShadow = '0 0 20px var(--core-green)';
+                valEl.style.color = '#000';
+              } else if (prob > 0.1) {
+                fillEl.style.background = 'rgba(16, 185, 129, 0.4)';
+                valEl.style.color = '#fff';
+              } else {
+                fillEl.style.background = 'transparent';
+                valEl.style.color = '#94a3b8';
+              }
+            }
+          }
+        }
+        statusText.innerHTML = "<b>Step 4: Softmax Probabilities.</b> The rows are exponentiated and normalized. $e^{-\\infty} = 0$, so future words get exactly 0.000%.";
+        btnNext.innerText = "Multiply by V ➔";
+        step = 3;
+      }
+      else if (step === 3) {
+        // STEP 4: Multiply by V
+        fmSoft.classList.remove('fm-hl');
+        fmSoftEnd.classList.remove('fm-hl');
+        fmV.classList.add('fm-hl');
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            const valEl = document.getElementById(`val-${r}-${c}`);
+            const fillEl = document.getElementById(`fill-${r}-${c}`);
+            if (c <= r) {
+              if (softmaxMatrix[r][c] > 0.1) {
+                valEl.innerText = `× V[${c}]`;
+                valEl.style.fontSize = '0.75rem';
+                fillEl.style.background = 'var(--val-orange)';
+                fillEl.style.boxShadow = 'none';
+                valEl.style.color = '#fff';
+              } else {
+                valEl.innerText = '-';
+              }
+            }
+          }
+        }
+        statusText.innerHTML = "<b>Step 5: Value Extraction.</b> The head absorbs semantic meaning from the permitted context vectors. This exact process happens simultaneously across all 16 heads.";
+        btnNext.innerText = "Concat & Project (W_O) ➔";
+        step = 4;
+      }
+      else if (step === 4) {
+        // STEP 5: Concat & WO Projection (NEW)
+        fmV.classList.remove('fm-hl');
+        fmConcat.classList.add('fm-hl');
+        fmWo.classList.add('fm-hl');
+
+        // Hide Heatmap, Show Projection Wrapper
+        heatWrapper.classList.add('hidden');
+        projWrapper.classList.add('active');
+
+        // Trigger animations in sequence
+        setTimeout(() => {
+          document.getElementById('headsRow').classList.add('merged');
+          document.getElementById('concatShapeLbl').style.opacity = '1';
+        }, 300);
+
+        setTimeout(() => {
+          document.getElementById('opMul').classList.add('active');
+          document.getElementById('woMatrix').classList.add('active');
+        }, 800);
+
+        setTimeout(() => {
+          document.getElementById('opEq').classList.add('active');
+          document.getElementById('finalOut').classList.add('active');
+        }, 1500);
+
+        statusText.innerHTML = "<b>Step 6: Concatenation & W<sub>O</sub> Projection.</b> The 16 independent 128D heads are concatenated back into a 2048D vector. This is multiplied by the Output Projection Matrix ($W_O$) to mix the multi-head insights together.";
+        
+        btnNext.innerText = "Reset Drill Down ↺";
+        btnNext.style.background = 'transparent';
+        btnNext.style.border = '1px solid var(--text-dim)';
+        btnNext.style.color = '#fff';
+        btnNext.style.boxShadow = 'none';
+        step = 5;
+      }
+      else if (step === 5) {
+        // RESET
+        fmConcat.classList.remove('fm-hl');
+        fmWo.classList.remove('fm-hl');
+        fmQK.classList.add('fm-hl');
+
+        projWrapper.classList.remove('active');
+        heatWrapper.classList.remove('hidden');
+        
+        // Reset animations
+        document.getElementById('headsRow').classList.remove('merged');
+        document.getElementById('concatShapeLbl').style.opacity = '0';
+        document.getElementById('opMul').classList.remove('active');
+        document.getElementById('woMatrix').classList.remove('active');
+        document.getElementById('opEq').classList.remove('active');
+        document.getElementById('finalOut').classList.remove('active');
+
+        // Reset Heatmap
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            const valEl = document.getElementById(`val-${r}-${c}`);
+            const fillEl = document.getElementById(`fill-${r}-${c}`);
+            valEl.innerText = rawMatrix[r][c].toFixed(1);
+            valEl.style.fontSize = '0.85rem';
+            valEl.style.color = '#94a3b8';
+            fillEl.style.height = '0%';
+            fillEl.style.opacity = '0';
+          }
+        }
+
+        statusText.innerHTML = "<b>Step 1: The Raw Dot Product.</b> Multiplying the Query and Key matrices yields huge, high-variance numbers.";
+        btnNext.innerText = "Scale by √d ➔";
+        btnNext.style.background = 'var(--attn-cyan)';
+        btnNext.style.border = 'none';
+        btnNext.style.color = '#000';
+        btnNext.style.boxShadow = '0 0 20px rgba(14, 165, 233, 0.3)';
+        step = 0;
+      }
+    }
+
+    // Initial highlight
+    fmQK.classList.add('fm-hl');
+
+  </script>
+</body>
+</html>

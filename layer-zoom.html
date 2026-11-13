@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Layer Topology // OLMoE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #050507;
+      --core-green: #10b981;
+      --attn-cyan: #0ea5e9;
+      --moe-purple: #8b5cf6;
+      --text-main: #f8fafc;
+      --text-dim: #475569;
+      --glass: rgba(15, 15, 20, 0.6);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-void);
+      color: var(--text-main);
+      overflow-x: hidden;
+      
+      background-image: 
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E"),
+        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 150px 150px, 40px 40px, 40px 40px;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex;
+      justify-content: space-between; align-items: center; 
+      backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 200;
+    }
+    .btn-back {
+      background: transparent; color: #94a3b8; border: 1px solid #334155;
+      padding: 8px 18px; font-size: 0.7rem; cursor: pointer; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s;
+      font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    }
+    .btn-back:hover { color: #fff; border-color: var(--core-green); box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
+
+    /* SCHEMATIC BOARD */
+    .board-wrapper {
+      position: relative; width: 100%; display: flex; justify-content: center;
+      padding: 60px 0; min-height: 1200px;
+    }
+    .board { width: 1000px; height: 1150px; position: relative; }
+
+    /* SVG WIRES */
+    .wires { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+    .wire { fill: none; stroke-width: 1px; stroke-dasharray: 4 4; }
+    .wire-core { stroke: rgba(16, 185, 129, 0.3); }
+    .wire-attn { stroke: rgba(14, 165, 233, 0.3); }
+    .wire-moe { stroke: rgba(139, 92, 246, 0.3); }
+
+    /* MASTER TIMELINE (12 SECONDS) */
+    .data-packet {
+      position: absolute; width: 12px; height: 12px; background: #fff;
+      border-radius: 50%; z-index: 10; margin: -6px 0 0 -6px;
+    }
+    .packet-core { box-shadow: 0 0 20px var(--core-green), 0 0 40px var(--core-green); animation: coreFlow 12s linear infinite; }
+    @keyframes coreFlow {
+      0% { transform: translate(500px, 20px); opacity: 0; }
+      2% { opacity: 1; } 4.16% { transform: translate(500px, 120px); }
+      29.16% { transform: translate(500px, 580px); } 37.5% { transform: translate(500px, 580px); }
+      41.66% { transform: translate(500px, 660px); } 66.66% { transform: translate(500px, 1000px); }
+      75.0% { transform: translate(500px, 1000px); } 83.33% { transform: translate(500px, 1150px); opacity: 1; }
+      85% { opacity: 0; transform: translate(500px, 1180px); } 100% { opacity: 0; transform: translate(500px, 1180px); }
+    }
+    .packet-attn { box-shadow: 0 0 20px var(--attn-cyan), 0 0 40px var(--attn-cyan); animation: attnFlow 12s linear infinite; }
+    @keyframes attnFlow {
+      0% { transform: translate(500px, 120px); opacity: 0; } 4.1% { opacity: 0; }
+      4.16% { transform: translate(500px, 120px); opacity: 1; } 6.66% { transform: translate(250px, 120px); }
+      26.66% { transform: translate(250px, 580px); } 29.16% { transform: translate(500px, 580px); opacity: 1; }
+      29.2% { opacity: 0; } 100% { opacity: 0; transform: translate(500px, 580px); }
+    }
+    .packet-moe { box-shadow: 0 0 20px var(--moe-purple), 0 0 40px var(--moe-purple); animation: moeFlow 12s linear infinite; }
+    @keyframes moeFlow {
+      0% { transform: translate(500px, 660px); opacity: 0; } 41.6% { opacity: 0; }
+      41.66% { transform: translate(500px, 660px); opacity: 1; } 44.16% { transform: translate(750px, 660px); }
+      64.16% { transform: translate(750px, 1000px); } 66.66% { transform: translate(500px, 1000px); opacity: 1; }
+      66.7% { opacity: 0; } 100% { opacity: 0; transform: translate(500px, 1000px); }
+    }
+
+    /* MACHINE BLOCKS */
+    .node {
+      position: absolute; transform: translate(-50%, -50%);
+      width: 220px; padding: 18px 24px; 
+      background: linear-gradient(180deg, rgba(20, 20, 25, 0.8) 0%, rgba(10, 10, 15, 0.8) 100%);
+      border: 1px solid rgba(255,255,255,0.05); border-top: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; backdrop-filter: blur(10px);
+      text-align: center; cursor: pointer; z-index: 5;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .node:hover { transform: translate(-50%, -50%) scale(1.03); z-index: 20; background: rgba(30, 30, 40, 0.9); }
+    .node-title { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.85rem; letter-spacing: 1px; color: #e2e8f0; transition: color 0.4s; }
+    .node-sub { font-family: 'Inter', sans-serif; font-size: 0.65rem; color: #64748b; margin-top: 6px; font-weight: 400; letter-spacing: 0.5px; }
+
+    .node.core { animation: glowCore 12s linear infinite; } .node.attn { animation: glowAttn 12s linear infinite; } .node.moe { animation: glowMoe 12s linear infinite; }
+    .node.n-in { animation-delay: 0s; }
+    @keyframes glowCore { 0%, 4% { border-color: var(--core-green); box-shadow: 0 0 30px rgba(16,185,129,0.15); } 5%, 100% { border-color: rgba(255,255,255,0.05); box-shadow: none; } }
+    .node.n-a1 { animation-delay: -10.8s; } .node.n-a2 { animation-delay: -10.3s; } .node.n-a3 { animation-delay: -9.7s; } .node.n-a4 { animation-delay: -9.2s; }
+    @keyframes glowAttn { 0%, 4% { border-color: var(--attn-cyan); box-shadow: 0 0 30px rgba(14,165,233,0.25); } 5%, 100% { border-color: rgba(255,255,255,0.05); box-shadow: none; } }
+    .node.n-m1 { animation-delay: -6.2s; } .node.n-m2 { animation-delay: -5.5s; } .node.n-m3 { animation-delay: -4.8s; }
+    @keyframes glowMoe { 0%, 4% { border-color: var(--moe-purple); box-shadow: 0 0 30px rgba(139,92,246,0.25); } 5%, 100% { border-color: rgba(255,255,255,0.05); box-shadow: none; } }
+    
+    .add-node { width: 120px; border-radius: 40px; padding: 12px; background: rgba(5,5,8,0.9); }
+    .add-node.n-add1 { animation: smashAdd1 12s linear infinite; } .add-node.n-add2 { animation: smashAdd2 12s linear infinite; }
+    @keyframes smashAdd1 { 0%, 28% { border-color: rgba(255,255,255,0.1); box-shadow: none; transform: translate(-50%, -50%) scale(1); } 29.16% { border-color: #fff; box-shadow: 0 0 50px #fff; transform: translate(-50%, -50%) scale(1.15); background: rgba(255,255,255,0.1); } 34% { border-color: var(--core-green); box-shadow: 0 0 20px rgba(16,185,129,0.3); transform: translate(-50%, -50%) scale(1); } 38%, 100% { border-color: rgba(255,255,255,0.1); box-shadow: none; transform: translate(-50%, -50%) scale(1); } }
+    @keyframes smashAdd2 { 0%, 65% { border-color: rgba(255,255,255,0.1); box-shadow: none; transform: translate(-50%, -50%) scale(1); } 66.66% { border-color: #fff; box-shadow: 0 0 50px #fff; transform: translate(-50%, -50%) scale(1.15); background: rgba(255,255,255,0.1); } 71% { border-color: var(--core-green); box-shadow: 0 0 20px rgba(16,185,129,0.3); transform: translate(-50%, -50%) scale(1); } 75%, 100% { border-color: rgba(255,255,255,0.1); box-shadow: none; transform: translate(-50%, -50%) scale(1); } }
+    .next-layer-text { position: absolute; left: 500px; top: 1140px; transform: translateX(-50%); font-family: 'Inter', sans-serif; font-weight: 200; font-size: 1.5rem; letter-spacing: 12px; color: #fff; opacity: 0.2; text-shadow: 0 0 20px #fff; animation: nextGlow 12s linear infinite; }
+    @keyframes nextGlow { 0%, 80% { opacity: 0.2; } 83%, 90% { opacity: 1; text-shadow: 0 0 40px #fff; } 100% { opacity: 0.2; } }
+
+    /* CHECKPOINTS */
+    .checkpoint {
+      position: absolute; transform: translate(-50%, -50%); width: 14px; height: 14px;
+      border: 1px solid #475569; border-radius: 50%; background: #050507; cursor: crosshair; z-index: 15; transition: all 0.2s;
+    }
+    .checkpoint:hover { transform: translate(-50%, -50%) scale(2); background: rgba(255,255,255,0.1); border-color: #fff; box-shadow: 0 0 15px #fff; }
+
+    /* DRAGGABLE HUD */
+    .hud {
+      position: fixed; bottom: 30px; right: 30px; width: 400px;
+      background: rgba(8, 8, 12, 0.85); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; backdrop-filter: blur(20px);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.8); z-index: 999;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .hud-drag-handle {
+      background: rgba(255,255,255,0.03); padding: 8px 15px; cursor: grab;
+      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;
+    }
+    .hud-drag-handle:active { cursor: grabbing; }
+    .hud-title { font-size: 0.75rem; font-weight: 700; color: #fff; letter-spacing: 2px; font-family: 'JetBrains Mono', monospace; }
+    .drag-icon { color: #64748b; font-size: 1rem; user-select: none; }
+    
+    .hud-content { padding: 20px; }
+    .hud-row { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; }
+    .hud-label { color: #64748b; }
+    .hud-val { color: var(--attn-cyan); font-weight: 700; }
+    .hud-desc { margin-top: 15px; font-size: 0.75rem; color: #94a3b8; line-height: 1.6; border-top: 1px dashed rgba(255,255,255,0.05); padding-top: 15px; }
+
+    /* EDITORIAL SECTION */
+    .editorial-section {
+      max-width: 1200px; margin: 0 auto; padding: 80px 40px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .ed-title { font-size: 2rem; font-weight: 200; letter-spacing: 4px; color: #fff; margin-bottom: 60px; text-align: center; }
+    .ed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+    @media (max-width: 900px) { .ed-grid { grid-template-columns: 1fr; } }
+    .ed-col h3 { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #fff; margin-bottom: 15px; letter-spacing: 1px; }
+    .ed-col p { font-size: 0.85rem; color: #94a3b8; line-height: 1.8; font-weight: 300; margin-bottom: 15px; }
+    .ed-col span.hl { color: #fff; font-weight: 400; }
+
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <button class="btn-back" onclick="window.close()">← Master Pipeline</button>
+    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
+      LAYER <span style="color:#fff; font-weight:600;">00</span> // MACRO TOPOLOGY
+    </div>
+  </div>
+
+  <div class="board-wrapper">
+    <div class="board" id="board">
+      
+      <svg class="wires">
+        <line x1="500" y1="40" x2="500" y2="1080" class="wire wire-core" />
+        <path d="M 500 120 L 250 120 L 250 580 L 500 580" class="wire wire-attn" />
+        <path d="M 500 660 L 750 660 L 750 1000 L 500 1000" class="wire wire-moe" />
+      </svg>
+
+      <div class="data-packet packet-core"></div><div class="data-packet packet-attn"></div><div class="data-packet packet-moe"></div>
+
+      <div class="node core n-in" style="left: 500px; top: 40px;" onmouseenter="updateHud('INPUT TENSOR', '[5, 2048]', 'FLOAT32', 'The hidden states from the previous sequence, flowing uninterrupted down the residual stream.')" onmouseleave="clearHud()">
+        <div class="node-title">RESIDUAL STREAM (IN)</div>
+      </div>
+      <div class="checkpoint" style="left: 500px; top: 120px;" onmouseenter="updateHud('SPLIT // ATTN', '[5, 2048]', 'COPY', 'Tensor is copied to the Attention Branch. The original continues down the spine to preserve gradient flow.')" onmouseleave="clearHud()"></div>
+
+      <!-- ATTENTION BRANCH -->
+      <div class="node attn n-a1" style="left: 250px; top: 200px;" onclick="window.open('rmsnorm-zoom.html', '_blank')" onmouseenter="updateHud('INPUT NORM', '[5, 2048]', 'RMSNorm', 'Scales the variance of the input vector to 1. Essential to stop deep networks from mathematically exploding.')" onmouseleave="clearHud()">
+        <div class="node-title">Input LayerNorm</div><div class="node-sub">RMSNorm Stabilization</div>
+      </div>
+      
+      <div class="node attn n-a2" style="left: 250px; top: 300px;" onclick="window.open('qkv-zoom.html', '_blank')" onmouseenter="updateHud('QKV MATMUL', '3x [5, 16, 128]', 'LINEAR', 'Splits the 2048-dimensional vector into 16 distinct attention heads (each 128-dimensions) for Query, Key, and Value.')" onmouseleave="clearHud()">
+        <div class="node-title">W_Q, W_K, W_V</div><div class="node-sub">Linear Head Projections</div>
+      </div>
+      
+      <div class="node attn n-a3" style="left: 250px; top: 400px;" onclick="window.open('rope-zoom.html', '_blank')" onmouseenter="updateHud('RoPE & QK-NORM', 'Q,K [5, 16, 128]', 'ROTATION', 'Rotary Position Embeddings rotate the Q and K vectors in 2D space to inject word order. QK-Norm then strictly bounds them to prevent attention spikes.')" onmouseleave="clearHud()">
+        <div class="node-title">RoPE + QK-Norm</div><div class="node-sub">Positional Encoding & Bounding</div>
+      </div>
+      
+      <div class="node attn n-a4" style="left: 250px; top: 500px;" onclick="window.open('attention-zoom.html', '_blank')" onmouseenter="updateHud('MHA CORE', 'Out: [5, 2048]', 'SOFTMAX', 'Calculates context. Q·K^T determines relationship strength between words. Scales, applies Softmax, multiplies by V, and projects via W_O.')" onmouseleave="clearHud()">
+        <div class="node-title">Multi-Head Attention</div><div class="node-sub">Softmax(Q·K^T)·V & W_O</div>
+      </div>
+
+      <div class="node add-node n-add1" style="left: 500px; top: 580px;" onmouseenter="updateHud('RESIDUAL ADD 01', '[5, 2048]', 'ADDITION', 'The newly computed attention context is literally added (+) to the original residual spine. No data is lost.')" onmouseleave="clearHud()">
+        <div class="node-title" style="font-size:1.2rem;">⊕ ADD</div>
+      </div>
+
+      <div class="checkpoint" style="left: 500px; top: 660px;" onmouseenter="updateHud('SPLIT // MoE', '[5, 2048]', 'COPY', 'Tensor is copied to the Mixture of Experts branch.')" onmouseleave="clearHud()"></div>
+
+      <!-- MOE BRANCH -->
+      <div class="node moe n-m1" style="left: 750px; top: 730px;" onclick="window.open('rmsnorm-zoom.html', '_blank')" onmouseenter="updateHud('POST-ATTN NORM', '[5, 2048]', 'RMSNorm', 'Re-normalizes the tensor after the Attention addition, prepping it for the expert networks.')" onmouseleave="clearHud()">
+        <div class="node-title">Post-Attn Norm</div><div class="node-sub">RMSNorm Stabilization</div>
+      </div>
+      
+      <div class="node moe n-m2" style="left: 750px; top: 830px;" onclick="window.open('moe-router-zoom.html', '_blank')" onmouseenter="updateHud('MoE ROUTER', 'Logits: [5, 64]', 'ARGMAX', 'The Router evaluates the token and assigns probabilities to all 64 experts. It selects the Top-8 highest scoring experts to do the actual math.')" onmouseleave="clearHud()">
+        <div class="node-title">Top-8 Router</div><div class="node-sub">Sparse Gating Mechanism</div>
+      </div>
+      
+      <div class="node moe n-m3" style="left: 750px; top: 930px;" onclick="window.open('swiglu-expert-zoom.html', '_blank')" onmouseenter="updateHud('SwiGLU EXPERTS', 'Out: [5, 2048]', 'NON-LINEAR', 'Only the 8 selected experts process this specific token using a SwiGLU activation function. The 56 unselected experts sleep, saving 87% compute.')" onmouseleave="clearHud()">
+        <div class="node-title">SwiGLU Experts (x8)</div><div class="node-sub">Conditional Computation</div>
+      </div>
+
+      <div class="node add-node n-add2" style="left: 500px; top: 1000px;" onmouseenter="updateHud('RESIDUAL ADD 02', '[5, 2048]', 'ADDITION', 'The MoE output is added (+) to the spine, finalizing the mathematical updates for this single layer.')" onmouseleave="clearHud()">
+        <div class="node-title" style="font-size:1.2rem;">⊕ ADD</div>
+      </div>
+
+      <div class="next-layer-text">NEXT LAYER</div>
+    </div>
+  </div>
+
+  <div class="editorial-section">
+    <h2 class="ed-title">THE DUAL-PATH ARCHITECTURE</h2>
+    <div class="ed-grid">
+      <div class="ed-col">
+        <h3 style="color: var(--core-green);">THE RESIDUAL HIGHWAY</h3>
+        <p>Deep neural networks suffer from <span class="hl">vanishing gradients</span>—as data passes through hundreds of layers, the signal gets corrupted or dies out.</p>
+        <p>OLMoE solves this by establishing a central "Spine". The raw data flows straight down this spine completely untouched. The Attention and MoE blocks merely <span class="hl">read</span> from the spine, compute new context, and <span class="hl">add</span> it back (+).</p>
+      </div>
+      <div class="ed-col">
+        <h3 style="color: var(--attn-cyan);">ATTENTION & ROPE</h3>
+        <p>The Attention branch answers one question: <span class="hl">"Which other words in this sentence matter to me?"</span></p>
+        <p>Before computing this, <span class="hl">RoPE</span> physically rotates the vectors based on their position in the sentence. Without RoPE, the model wouldn't know the difference between "The dog bit the man" and "The man bit the dog."</p>
+      </div>
+      <div class="ed-col">
+        <h3 style="color: var(--moe-purple);">SPARSE EXPERT COMPUTE</h3>
+        <p>A standard 7B model forces every token through all 7 Billion parameters. OLMoE uses <span class="hl">Mixture of Experts (MoE)</span>.</p>
+        <p>The Router analyzes a token (like "Paris") and activates only 8 specialized sub-networks out of 64 (perhaps the geography and language experts). This means it performs like a 7B model, but runs as fast as a 1B model.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAGGABLE HUD -->
+  <div class="hud" id="hud">
+    <div class="hud-drag-handle" id="hudHandle">
+      <div class="hud-title" id="hudTitle">SYSTEM STANDBY</div>
+      <div class="drag-icon">⠿ DRAG</div>
+    </div>
+    <div class="hud-content">
+      <div class="hud-row"><span class="hud-label">SHAPE:</span> <span class="hud-val" id="hudShape">--</span></div>
+      <div class="hud-row"><span class="hud-label">OP TYPE:</span> <span class="hud-val" id="hudType" style="color:#fff">--</span></div>
+      <div class="hud-desc" id="hudDesc">Hover over any machine block or wire node to intercept the tensor telemetry.</div>
+    </div>
+  </div>
+
+  <script>
+    // --- HUD TELEMETRY UPDATE ---
+    const hudTitle = document.getElementById('hudTitle');
+    const hudShape = document.getElementById('hudShape');
+    const hudType = document.getElementById('hudType');
+    const hudDesc = document.getElementById('hudDesc');
+
+    function updateHud(title, shape, type, desc) {
+      hudTitle.innerText = title; hudShape.innerText = shape;
+      hudType.innerText = type; hudDesc.innerText = desc;
+    }
+
+    function clearHud() {
+      hudTitle.innerText = "SYSTEM STANDBY"; hudShape.innerText = "--";
+      hudType.innerText = "--"; hudDesc.innerText = "Hover over any machine block or wire node to intercept the tensor telemetry.";
+    }
+
+    // --- HUD DRAG AND DROP LOGIC ---
+    const hud = document.getElementById('hud');
+    const hudHandle = document.getElementById('hudHandle');
+
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    hudHandle.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      const rect = hud.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      
+      hud.style.bottom = 'auto';
+      hud.style.right = 'auto';
+      hud.style.left = rect.left + 'px';
+      hud.style.top = rect.top + 'px';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      let x = e.clientX - offsetX;
+      let y = e.clientY - offsetY;
+      
+      x = Math.max(0, Math.min(window.innerWidth - hud.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - hud.offsetHeight, y));
+      
+      hud.style.left = x + 'px';
+      hud.style.top = y + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // --- RESPONSIVE SCALING ---
+    function resizeBoard() {
+      const board = document.getElementById('board');
+      const winWidth = window.innerWidth;
+      if (winWidth < 1050) {
+        board.style.transform = `scale(${winWidth / 1050})`;
+        board.style.transformOrigin = 'top center';
+      } else {
+        board.style.transform = `scale(1)`;
+      }
+    }
+    window.addEventListener('resize', resizeBoard);
+    resizeBoard();
+  </script>
+</body>
+</html>

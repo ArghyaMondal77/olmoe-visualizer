@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Micro-Architecture: Tokenizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+      --machine-bg: #121214;
+      --machine-border: #2a2a35;
+      --glass-bg: rgba(5, 5, 8, 0.85);
+      --glass-border: #222230;
+      --glow-cyan: #00f0ff;
+      --glow-green: #00ff66;
+      --text-main: #e2e8f0;
+      --text-dim: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    /* NAVIGATION */
+    .nav-bar {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .btn-back {
+      background: rgba(18, 18, 20, 0.9);
+      color: var(--text-main);
+      border: 1px solid var(--machine-border);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .btn-back:hover {
+      border-color: var(--glow-cyan);
+      color: var(--glow-cyan);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+    }
+
+    .page-title {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* MAIN CONTAINER */
+    .container {
+      width: 100%;
+      max-width: 900px;
+      background: var(--machine-bg);
+      border: 2px solid var(--machine-border);
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 2px 10px rgba(255,255,255,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    /* SECTION 1: ANIMATED EXAMPLE */
+    .section-title {
+      font-size: 1.2rem;
+      color: var(--glow-cyan);
+      margin-bottom: 15px;
+      border-bottom: 1px solid #334;
+      padding-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .glass-panel {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 30px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 5px 20px rgba(0,0,0,0.8);
+    }
+
+    .animation-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      min-height: 180px;
+      justify-content: center;
+    }
+
+    .raw-word {
+      font-size: 1.5rem;
+      color: #fff;
+      letter-spacing: 2px;
+      transition: all 0.5s;
+    }
+
+    .subwords-container {
+      display: flex;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .subwords-container.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .subword-block {
+      background: #1e1e24;
+      border: 1px solid var(--glow-cyan);
+      border-radius: 6px;
+      padding: 10px 15px;
+      text-align: center;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+    }
+
+    .subword-text { font-size: 1.1rem; color: #fff; font-weight: 700; margin-bottom: 5px; }
+    .subword-id { font-size: 0.75rem; color: var(--glow-cyan); }
+    .space-char { color: #64748b; font-weight: normal; }
+
+    /* SECTION 2: CONCEPTUAL EXPLANATION */
+    .concept-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    @media (min-width: 768px) {
+      .concept-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    .info-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid #2a2a35;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    .info-card h4 { color: #fff; margin-bottom: 10px; font-size: 0.95rem; }
+    .info-card p { color: #94a3b8; font-size: 0.85rem; line-height: 1.6; }
+    .info-card span.highlight { color: var(--glow-green); }
+
+    /* SECTION 3: OLMOE SPECS BENTO GRID */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+    @media (min-width: 768px) {
+      .bento-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .bento-box {
+      background: #0a0a0d;
+      border: 1px solid #334;
+      border-radius: 8px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.3s;
+    }
+    .bento-box:hover {
+      border-color: var(--glow-cyan);
+      background: rgba(0, 240, 255, 0.05);
+    }
+
+    .bento-label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .bento-value { font-size: 1.2rem; color: #fff; font-weight: 700; }
+    .bento-value.green { color: var(--glow-green); }
+
+    .replay-btn {
+      margin-top: 20px;
+      background: transparent;
+      border: 1px solid #445;
+      color: var(--text-dim);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.7rem;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+    .replay-btn:hover { border-color: #fff; color: #fff; }
+
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <div class="nav-bar">
+    <button class="btn-back" onclick="window.close()">← Close Zoom</button>
+    <div class="page-title">Micro-Architecture: Tokenizer</div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="container">
+    
+    <!-- 1. VISUAL EXAMPLE -->
+    <div>
+      <div class="section-title">
+        <div style="width: 8px; height: 8px; background: var(--glow-cyan); border-radius: 50%; box-shadow: 0 0 10px var(--glow-cyan);"></div>
+        BPE Subword Fracturing
+      </div>
+      <div class="glass-panel">
+        <div class="animation-stage">
+          <div class="raw-word" id="rawWord">" Counterproductive"</div>
+          <div class="subwords-container" id="subwords">
+            <div class="subword-block">
+              <div class="subword-text"><span class="space-char">Ġ</span>Counter</div>
+              <div class="subword-id">ID: 14210</div>
+            </div>
+            <div class="subword-block">
+              <div class="subword-text">product</div>
+              <div class="subword-id">ID: 2189</div>
+            </div>
+            <div class="subword-block">
+              <div class="subword-text">ive</div>
+              <div class="subword-id">ID: 412</div>
+            </div>
+          </div>
+          <button class="replay-btn" onclick="playAnimation()">Replay Animation ↺</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. CONCEPTUAL EXPLANATION -->
+    <div>
+      <div class="section-title">
+        <div style="width: 8px; height: 8px; background: var(--glow-green); border-radius: 50%; box-shadow: 0 0 10px var(--glow-green);"></div>
+        How Byte-Pair Encoding Works
+      </div>
+      <div class="concept-grid">
+        <div class="info-card">
+          <h4>1. The Vocabulary Problem</h4>
+          <p>If an LLM uses characters, sequences are too long. If it uses whole words, it can't handle typos, new slang, or suffixes (causing massive "Out of Vocabulary" errors). <span class="highlight">BPE is the mathematical middle-ground.</span></p>
+        </div>
+        <div class="info-card">
+          <h4>2. The Training Process</h4>
+          <p>The tokenizer starts by breaking a massive text corpus into raw bytes. It scans for the most frequently adjacent pairs (like 'e' and 'r' -> 'er') and merges them. It repeats this merging process exactly <span class="highlight">50,304 times</span>.</p>
+        </div>
+        <div class="info-card">
+          <h4>3. Handling Spaces (The Ġ Symbol)</h4>
+          <p>Modern tokenizers don't ignore spaces. They treat a space as part of the word to preserve formatting. The symbol <span class="highlight">Ġ</span> is visually used in the tokenizer dictionary to represent a leading space before a word.</p>
+        </div>
+        <div class="info-card">
+          <h4>4. Inference (Splitting)</h4>
+          <p>When you input a complex word like "Counterproductive", the tokenizer checks its dictionary. It doesn't have the full word, so it breaks it down into the largest learned subwords it knows: <span class="highlight">ĠCounter + product + ive</span>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. OLMOE SPECS -->
+    <div>
+      <div class="section-title" style="color: #fff; border-bottom-color: #445;">
+        OLMoE-1B-7B Specific Characteristics
+      </div>
+      <div class="bento-grid">
+        <div class="bento-box">
+          <div class="bento-label">Algorithm</div>
+          <div class="bento-value">BPE</div>
+        </div>
+        <div class="bento-box">
+          <div class="bento-label">Total Vocab Size</div>
+          <div class="bento-value green">50,304</div>
+        </div>
+        <div class="bento-box">
+          <div class="bento-label">Input Tensor Shape</div>
+          <div class="bento-value">(Batch, Seq)</div>
+        </div>
+        <div class="bento-box">
+          <div class="bento-label">Data Type</div>
+          <div class="bento-value">INT64</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const rawWord = document.getElementById('rawWord');
+    const subwords = document.getElementById('subwords');
+
+    function playAnimation() {
+      // Reset
+      rawWord.style.opacity = '1';
+      rawWord.style.transform = 'scale(1)';
+      subwords.classList.remove('visible');
+
+      // Sequence
+      setTimeout(() => {
+        rawWord.style.opacity = '0';
+        rawWord.style.transform = 'scale(0.8)';
+      }, 800);
+
+      setTimeout(() => {
+        subwords.classList.add('visible');
+      }, 1200);
+    }
+
+    // Auto-play on load
+    window.onload = () => {
+      setTimeout(playAnimation, 500);
+    };
+  </script>
+</body>
+</html>

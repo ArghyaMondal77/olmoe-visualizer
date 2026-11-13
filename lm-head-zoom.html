@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Micro-Math // LM Head & Softmax</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #050507;
+      --core-green: #10b981;
+      --attn-cyan: #0ea5e9;
+      --moe-purple: #8b5cf6;
+      --alert-red: #f43f5e;
+      --val-orange: #f59e0b;
+      --text-main: #f8fafc;
+      --text-dim: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif; background-color: var(--bg-void); color: var(--text-main);
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+      display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+      scroll-behavior: smooth; padding-bottom: 120px;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      width: 100%; height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.9);
+      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between;
+      align-items: center; backdrop-filter: blur(12px); position: fixed; top: 0; z-index: 200;
+    }
+    .btn-back {
+      background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 8px 18px;
+      font-size: 0.7rem; cursor: pointer; border-radius: 4px; text-transform: uppercase;
+      letter-spacing: 2px; transition: all 0.3s; font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    }
+    .btn-back:hover { color: #fff; border-color: var(--core-green); box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
+
+    /* CONTENT LAYOUT */
+    .content-wrapper {
+      width: 100%; max-width: 1000px; padding: 100px 20px 40px 20px;
+      display: flex; flex-direction: column; gap: 60px;
+    }
+
+    /* HEADER */
+    .math-header { text-align: center; }
+    .math-title { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; color: var(--core-green); letter-spacing: 2px; margin-bottom: 20px; }
+    
+    .formula-box {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);
+      padding: 25px 40px; border-radius: 8px; display: inline-block;
+      font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #cbd5e1;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5); letter-spacing: 1px; line-height: 1.8;
+      text-align: left;
+    }
+    .fm-hl { color: var(--core-green); font-weight: bold; }
+    .fm-p { color: var(--attn-cyan); font-weight: bold; }
+
+    /* PIPELINE STEPS */
+    .pipeline-step {
+      display: flex; flex-direction: column; gap: 20px; opacity: 0; transform: translateY(40px);
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
+    }
+    .pipeline-step.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+    .step-title {
+      font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #fff;
+      border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px;
+      display: flex; justify-content: space-between; align-items: flex-end;
+    }
+    .step-desc { font-family: 'Inter', sans-serif; font-size: 0.9rem; color: var(--text-dim); font-weight: 300; max-width: 600px;}
+
+    /* VISUAL NODES */
+    .node-grid { display: flex; justify-content: center; gap: 30px; align-items: center; }
+    
+    .data-node {
+      background: #0a0a0d; border: 1px solid #334155; padding: 25px; border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-width: 260px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; transition: all 0.5s;
+    }
+    .data-node.glow-c { border-color: var(--attn-cyan); box-shadow: 0 0 30px rgba(14, 165, 233, 0.15); background: rgba(14, 165, 233, 0.05); }
+    .data-node.glow-p { border-color: var(--moe-purple); box-shadow: 0 0 30px rgba(139, 92, 246, 0.15); background: rgba(139, 92, 246, 0.05); }
+    .data-node.glow-g { border-color: var(--core-green); box-shadow: 0 0 30px rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.1); transform: scale(1.05); }
+
+    .n-title { font-size: 0.85rem; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 15px; font-weight: 600; text-align: center;}
+    .n-val { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; color: #fff; font-weight: bold; margin-bottom: 15px; }
+    
+    .shape-box {
+      background: rgba(0,0,0,0.5); border: 1px dashed rgba(255,255,255,0.2); padding: 10px 15px;
+      border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #cbd5e1;
+      display: flex; flex-direction: column; gap: 5px; align-items: center; width: 100%;
+    }
+    .shape-math { color: var(--moe-purple); font-weight: bold; }
+    .math-symbol { font-size: 2rem; color: #475569; font-weight: bold; }
+
+    /* VOCABULARY WALL (THE 50,304 LIST) */
+    .vocab-wall {
+      width: 100%; background: #0a0a0d; border: 1px solid #1e293b; border-radius: 12px;
+      padding: 20px; box-shadow: inset 0 0 30px rgba(0,0,0,0.8); display: flex; flex-direction: column; gap: 8px;
+    }
+    .wall-header {
+      display: flex; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #64748b;
+      font-weight: bold; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 10px;
+    }
+    
+    .token-row {
+      display: flex; align-items: center; background: rgba(255,255,255,0.02);
+      border: 1px solid transparent; border-radius: 6px; padding: 10px 15px;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden;
+    }
+    .t-id { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #94a3b8; width: 80px; z-index: 2; }
+    .t-word { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #e2e8f0; font-weight: bold; width: 140px; z-index: 2; }
+    
+    .t-bar-bg { flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; margin: 0 20px; overflow: hidden; z-index: 2; position: relative;}
+    .t-bar-fill { height: 100%; width: 0%; background: #475569; transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+    
+    .t-val { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #cbd5e1; font-weight: bold; width: 80px; text-align: right; z-index: 2; transition: color 0.5s; }
+
+    /* State 1: Raw Logits */
+    .state-logits .t-bar-fill { background: var(--moe-purple); box-shadow: 0 0 10px var(--moe-purple); }
+    
+    /* State 2: Softmax */
+    .state-softmax .t-bar-fill { background: var(--attn-cyan); box-shadow: 0 0 10px var(--attn-cyan); }
+    .state-softmax .t-val { color: var(--attn-cyan); }
+    
+    /* State 3: Argmax (Winner takes all) */
+    .state-argmax .token-row { opacity: 0.2; }
+    .state-argmax .token-row.winner {
+      opacity: 1; border-color: var(--core-green); background: rgba(16, 185, 129, 0.1);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); transform: scale(1.02); z-index: 10;
+    }
+    .state-argmax .token-row.winner .t-bar-fill { background: var(--core-green); box-shadow: 0 0 15px var(--core-green); }
+    .state-argmax .token-row.winner .t-val { color: var(--core-green); font-size: 1.1rem; }
+    .state-argmax .token-row.winner .t-word { color: var(--core-green); }
+
+    /* FIXED CONTROLS */
+    .control-deck {
+      position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(5, 5, 7, 0.95);
+      border-top: 1px solid rgba(255,255,255,0.1); padding: 20px 40px;
+      display: flex; justify-content: center; align-items: center; gap: 30px;
+      backdrop-filter: blur(20px); z-index: 200; box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+    }
+    .btn-step {
+      background: var(--core-green); color: #000; border: none; padding: 14px 32px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; cursor: pointer;
+      text-transform: uppercase; transition: all 0.3s; box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    }
+    .btn-step:hover { box-shadow: 0 0 30px rgba(16, 185, 129, 0.6); transform: translateY(-2px); }
+    .status-text { font-family: 'Inter', sans-serif; font-size: 0.95rem; color: #cbd5e1; max-width: 600px; line-height: 1.5; }
+
+    /* EDITORIAL SECTION */
+    .editorial-section { width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px; margin-top: 20px;}
+    .ed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+    @media (max-width: 900px) { .ed-grid { grid-template-columns: 1fr; } }
+    .ed-col h3 { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #fff; margin-bottom: 15px; letter-spacing: 1px; border-bottom: 1px solid #334; padding-bottom: 8px;}
+    .ed-col p { font-size: 0.85rem; color: #94a3b8; line-height: 1.8; font-weight: 300; margin-bottom: 15px; }
+    .ed-col span.hl { color: #fff; font-weight: 600; }
+
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <button class="btn-back" onclick="window.close()">← Macro Topology</button>
+    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
+      MICRO-MATH <span style="color:#fff; font-weight:600;">//</span> LM HEAD
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    
+    <div class="math-header">
+      <div class="math-title">Language Modeling Head</div>
+      <div class="formula-box">
+        <div style="color:#64748b; font-size:0.8rem; margin-bottom:5px; text-transform:uppercase;">1. Project to Vocabulary Space</div>
+        Logits = <span class="fm-p">x<sub>final</sub></span> · W<sub>unembed</sub>
+        <br><br>
+        <div style="color:#64748b; font-size:0.8rem; margin-bottom:5px; text-transform:uppercase;">2. Convert to Probabilities & Select</div>
+        Token = <span class="fm-hl">Argmax</span>( Softmax(Logits) )
+      </div>
+    </div>
+
+    <!-- STEP 0: THE FINAL STATE -->
+    <div class="pipeline-step active" id="step-0">
+      <div class="step-title">
+        <span>00 // LAYER 16 OUTPUT</span>
+      </div>
+      <div class="node-grid">
+        <div class="data-node glow-c">
+          <div class="n-title">Final Hidden State (x)</div>
+          <div class="n-val" style="color:var(--attn-cyan)">[ 0.84, -1.2, ... ]</div>
+          <div class="shape-box" style="border-color: rgba(14, 165, 233, 0.3);">
+            Tensor Shape
+            <span class="shape-math" style="color:var(--attn-cyan)">[1, 2048]</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 1: UNEMBEDDING MATMUL -->
+    <div class="pipeline-step" id="step-1">
+      <div class="step-title">
+        <span>01 // W_UNEMBED PROJECTION</span>
+        <span class="step-desc">The 2048D vector is multiplied by a massive matrix to generate a score for every single word in the model's 50,304 dictionary.</span>
+      </div>
+      <div class="node-grid">
+        <div class="math-symbol">×</div>
+        <div class="data-node glow-p">
+          <div class="n-title">Unembedding Matrix</div>
+          <div class="n-val" style="color:var(--moe-purple)">W<sub>unembed</sub></div>
+          <div class="shape-box" style="border-color: rgba(139, 92, 246, 0.3);">
+            Weights Shape
+            <span class="shape-math">[2048, 50304]</span>
+          </div>
+        </div>
+        <div class="math-symbol">=</div>
+        <div class="data-node">
+          <div class="n-title">Raw Logits</div>
+          <div class="n-val">[ 50,304 Scores ]</div>
+          <div class="shape-box">
+            [1, 2048] × [2048, 50304]
+            <span class="shape-math" style="color: #fff">➔ [1, 50304]</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 & 3: VOCAB WALL (LOGITS -> SOFTMAX -> ARGMAX) -->
+    <div class="pipeline-step" id="step-2">
+      <div class="step-title" id="wall-title">
+        <span>02 // THE VOCABULARY DISTRIBUTION</span>
+        <span class="step-desc">A cross-section of the 50,304 tokens.</span>
+      </div>
+      
+      <div class="vocab-wall" id="vocabWall">
+        <div class="wall-header">
+          <div style="width: 80px;">TOKEN ID</div>
+          <div style="width: 140px;">BPE DECODE</div>
+          <div style="flex: 1; text-align: center;">ACTIVATION LEVEL</div>
+          <div style="width: 80px; text-align: right;">VALUE</div>
+        </div>
+        
+        <!-- Tokens -->
+        <div class="token-row" id="row-0">
+          <div class="t-id">ID: 00013</div><div class="t-word">.</div>
+          <div class="t-bar-bg"><div class="t-bar-fill" id="bar-0"></div></div>
+          <div class="t-val" id="val-0">--</div>
+        </div>
+        
+        <div class="token-row" id="row-1">
+          <div class="t-id">ID: 04502</div><div class="t-word">Ġlocated</div>
+          <div class="t-bar-bg"><div class="t-bar-fill" id="bar-1"></div></div>
+          <div class="t-val" id="val-1">--</div>
+        </div>
+        
+        <div class="token-row" id="row-2">
+          <div class="t-id">ID: 08211</div><div class="t-word">Ġstrictly</div>
+          <div class="t-bar-bg"><div class="t-bar-fill" id="bar-2"></div></div>
+          <div class="t-val" id="val-2">--</div>
+        </div>
+
+        <div class="token-row winner" id="row-3" style="opacity: 0.5;">
+          <div class="t-id">ID: 03001</div><div class="t-word">ĠParis</div>
+          <div class="t-bar-bg"><div class="t-bar-fill" id="bar-3"></div></div>
+          <div class="t-val" id="val-3">--</div>
+        </div>
+
+        <div class="token-row" id="row-4">
+          <div class="t-id">ID: 15409</div><div class="t-word">Ġbaguette</div>
+          <div class="t-bar-bg"><div class="t-bar-fill" id="bar-4"></div></div>
+          <div class="t-val" id="val-4">--</div>
+        </div>
+
+        <!-- Ellipsis -->
+        <div class="token-row" style="background: transparent; border: none;">
+          <div style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: #475569; width: 100%; text-align: center; letter-spacing: 2px;">... AND 50,299 OTHER TOKENS ...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: FINAL SELECTION -->
+    <div class="pipeline-step" id="step-4">
+      <div class="step-title">
+        <span style="color: var(--core-green)">04 // TOKEN GENERATION COMPLETE</span>
+      </div>
+      <div class="node-grid">
+        <div class="data-node glow-g" style="width: 400px;">
+          <div class="n-title" style="color: var(--core-green);">Autoregressive Output</div>
+          <div class="n-val" style="font-size: 2rem; color: #fff;">" Paris"</div>
+          <div class="shape-box" style="border-color: rgba(16, 185, 129, 0.3);">
+            This token is appended to the input context,<br>and the <b>entire process runs again</b> for the next word.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDITORIAL -->
+    <div class="editorial-section">
+      <div class="ed-grid">
+        <div class="ed-col">
+          <h3 style="color: var(--moe-purple);">THE UNEMBEDDING MATRIX</h3>
+          <p>In many architectures, the W_unembed matrix is exactly the same matrix as the Input Embedding (W_E) from the Tokenizer, just transposed. This saves millions of parameters (Weight Tying).</p>
+          <p>It takes the abstract 2048-dimensional "thought" the network formed and mathematically maps it back into the 50,304 concrete words we humans understand.</p>
+        </div>
+        <div class="ed-col">
+          <h3 style="color: var(--attn-cyan);">THE SOFTMAX BOTTLENECK</h3>
+          <p>The matrix multiplication produces <span class="hl">Logits</span>—raw confidence scores that can range from -100 to +100. </p>
+          <p>The Softmax function forces these 50,304 unbounded numbers into a strict probability distribution that sums exactly to 1.0 (100%). This step is what allows the model to calculate its "certainty" about the next word.</p>
+        </div>
+        <div class="ed-col">
+          <h3 style="color: var(--core-green);">GREEDY VS. SAMPLING</h3>
+          <p>Our visualization uses <span class="hl">Argmax (Greedy Decoding)</span>, which always blindly picks the single highest probability (98.2%).</p>
+          <p>In reality, we often use <b>Temperature</b> and <b>Top-P</b> sampling. Instead of always picking the #1 word, the model rolls a weighted multi-sided die based on these probabilities, allowing it to generate creative, varied text rather than robotic repetition.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FIXED CONTROL DECK -->
+  <div class="control-deck">
+    <div class="status-text" id="statusText">
+      <b>Step 0:</b> The 16th and final decoder layer outputs the ultimate 2048-dimensional representation of the sequence.
+    </div>
+    <button class="btn-step" id="btnNext" onclick="triggerNext()">Project to Vocab ➔</button>
+  </div>
+
+  <script>
+    // Data setup for the 5 visual tokens
+    const visualTokens = [
+      { id: 13, word: ".", raw: 2.1 },
+      { id: 4502, word: "Ġlocated", raw: 8.5 },
+      { id: 8211, word: "Ġstrictly", raw: 9.2 },
+      { id: 3001, word: "ĠParis", raw: 15.4 }, // Winner
+      { id: 15409, word: "Ġbaguette", raw: -1.2 }
+    ];
+
+    // Compute actual softmax for accurate display
+    const maxRaw = Math.max(...visualTokens.map(t => t.raw));
+    const exps = visualTokens.map(t => Math.exp(t.raw - maxRaw));
+    const sumExps = exps.reduce((a, b) => a + b, 0); // Note: technically we should sum all 50k, but we fake it for the 5 visible ones to ensure they sum to ~100%
+    const probs = exps.map(e => e / sumExps);
+    
+    visualTokens.forEach((t, i) => t.prob = probs[i]);
+
+    let step = 0;
+    const btnNext = document.getElementById('btnNext');
+    const statusText = document.getElementById('statusText');
+    const vocabWall = document.getElementById('vocabWall');
+    const wallTitle = document.getElementById('wall-title');
+
+    function triggerNext() {
+      if (step === 0) {
+        // Step 1: Show MatMul & Raw Logits
+        const s = document.getElementById('step-1');
+        s.classList.add('active');
+        s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        const s2 = document.getElementById('step-2');
+        s2.classList.add('active');
+        vocabWall.className = 'vocab-wall state-logits';
+        wallTitle.innerHTML = `<span>02 // RAW LOGITS (W_UNEMBED OUTPUT)</span><span class="step-desc">Unbounded confidence scores ranging from $-\\infty$ to $+\\infty$.</span>`;
+
+        // Populate Logits
+        visualTokens.forEach((t, i) => {
+          document.getElementById(`val-${i}`).innerText = t.raw.toFixed(1);
+          // Just a visual percentage of the max logit
+          const width = Math.max(0, (t.raw / 15.4) * 100);
+          document.getElementById(`bar-${i}`).style.width = `${width}%`;
+        });
+
+        statusText.innerHTML = "<b>Step 1: Unembedding.</b> The 2048D vector is multiplied by W_unembed, generating 50,304 raw logit scores simultaneously.";
+        btnNext.innerText = "Apply Softmax ➔";
+        btnNext.style.background = 'var(--attn-cyan)';
+        btnNext.style.boxShadow = '0 0 20px rgba(14, 165, 233, 0.3)';
+        step = 1;
+      }
+      else if (step === 1) {
+        // Step 2: Softmax Probabilities
+        vocabWall.className = 'vocab-wall state-softmax';
+        wallTitle.innerHTML = `<span>03 // SOFTMAX PROBABILITIES</span><span class="step-desc">Strict percentages summing to 100%.</span>`;
+
+        // Populate Probs
+        visualTokens.forEach((t, i) => {
+          const perc = (t.prob * 100).toFixed(2);
+          document.getElementById(`val-${i}`).innerText = `${perc}%`;
+          document.getElementById(`bar-${i}`).style.width = `${perc}%`;
+        });
+
+        statusText.innerHTML = "<b>Step 2: Softmax.</b> The raw logits are exponentiated and normalized. The entire 50,304 array now forms a strict probability distribution summing to exactly 1.0.";
+        btnNext.innerText = "Execute Argmax ➔";
+        btnNext.style.background = 'var(--core-green)';
+        btnNext.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.3)';
+        step = 2;
+      }
+      else if (step === 2) {
+        // Step 3: Argmax Selection
+        vocabWall.className = 'vocab-wall state-argmax';
+        document.getElementById('row-3').style.opacity = '1'; // Ensure winner is fully opaque
+        wallTitle.innerHTML = `<span style="color:var(--core-green)">03 // ARGMAX(PROBABILITIES)</span><span class="step-desc">Selecting the absolute maximum value.</span>`;
+
+        const s4 = document.getElementById('step-4');
+        s4.classList.add('active');
+        s4.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        statusText.innerHTML = "<b>Step 3: Argmax Selection.</b> Using greedy decoding, the system mathematically selects the index with the absolute highest probability. ID: 3001 (' Paris') wins.";
+        btnNext.innerText = "Reset Pipeline ↺";
+        btnNext.style.background = 'transparent';
+        btnNext.style.border = '1px solid var(--text-dim)';
+        btnNext.style.color = '#fff';
+        btnNext.style.boxShadow = 'none';
+        step = 3;
+      }
+      else if (step === 3) {
+        // Reset Everything
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        setTimeout(() => {
+          document.getElementById('step-1').classList.remove('active');
+          document.getElementById('step-2').classList.remove('active');
+          document.getElementById('step-4').classList.remove('active');
+          
+          vocabWall.className = 'vocab-wall';
+          visualTokens.forEach((t, i) => {
+            document.getElementById(`val-${i}`).innerText = "--";
+            document.getElementById(`bar-${i}`).style.width = `0%`;
+          });
+          document.getElementById('row-3').style.opacity = '0.5';
+
+          statusText.innerHTML = "<b>Step 0:</b> The 16th and final decoder layer outputs the ultimate 2048-dimensional representation of the sequence.";
+          btnNext.innerText = "Project to Vocab ➔";
+          btnNext.style.background = 'var(--core-green)';
+          btnNext.style.border = 'none';
+          btnNext.style.color = '#000';
+          btnNext.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.3)';
+          step = 0;
+        }, 500);
+      }
+    }
+  </script>
+</body>
+</html>

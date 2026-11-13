@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Micro-Math // RMSNorm</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #050507;
+      --core-green: #10b981;
+      --attn-cyan: #0ea5e9;
+      --moe-purple: #8b5cf6;
+      --alert-red: #f43f5e;
+      --text-main: #f8fafc;
+      --text-dim: #475569;
+      --glass: rgba(15, 15, 20, 0.6);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-void);
+      color: var(--text-main);
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
+        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      width: 100%; height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex;
+      justify-content: space-between; align-items: center; 
+      backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 200;
+    }
+    .btn-back {
+      background: transparent; color: #94a3b8; border: 1px solid #334155;
+      padding: 8px 18px; font-size: 0.7rem; cursor: pointer; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s;
+      font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    }
+    .btn-back:hover { color: #fff; border-color: var(--attn-cyan); box-shadow: 0 0 15px rgba(14, 165, 233, 0.2); }
+
+    /* LAYOUT */
+    .content-wrapper {
+      width: 100%; max-width: 1000px; padding: 40px 20px;
+      display: flex; flex-direction: column; gap: 30px;
+    }
+
+    /* HEADER & FORMULA */
+    .math-header {
+      text-align: center; margin-bottom: 20px;
+    }
+    .math-title { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; color: var(--attn-cyan); letter-spacing: 2px; margin-bottom: 15px; }
+    .formula-box {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);
+      padding: 20px 40px; border-radius: 8px; display: inline-block;
+      font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; color: #cbd5e1;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+    }
+    .formula-hl { color: var(--attn-cyan); font-weight: 700; }
+    .formula-gamma { color: var(--core-green); font-weight: 700; }
+
+    /* ANIMATION STAGE */
+    .stage {
+      background: linear-gradient(180deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.9) 100%);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+      padding: 40px; position: relative;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      display: flex; flex-direction: column; align-items: center;
+    }
+    
+    .vector-container {
+      display: flex; gap: 15px; align-items: flex-end; height: 250px;
+      padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.1);
+      position: relative; width: 100%; justify-content: center;
+    }
+
+    /* The RMS Threshold Line */
+    .rms-line {
+      position: absolute; left: 0; right: 0; height: 1px;
+      background: var(--attn-cyan); opacity: 0; bottom: 40px; /* Base 0 */
+      transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 0 10px var(--attn-cyan); z-index: 0;
+    }
+    .rms-label {
+      position: absolute; right: 20px; top: -20px; font-family: 'JetBrains Mono';
+      font-size: 0.75rem; color: var(--attn-cyan); font-weight: bold;
+    }
+
+    /* Vector Bars */
+    .v-bar-wrapper {
+      display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 5;
+    }
+    
+    .v-bar {
+      width: 40px; background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4); border-radius: 4px;
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+    .v-bar.positive { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .v-bar.negative { border-top-left-radius: 0; border-top-right-radius: 0; transform-origin: top; }
+
+    /* States */
+    .state-raw .v-bar { background: rgba(244, 63, 94, 0.2); border-color: var(--alert-red); box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); }
+    .state-sq .v-bar { background: rgba(139, 92, 246, 0.3); border-color: var(--moe-purple); box-shadow: 0 0 20px rgba(139, 92, 246, 0.4); }
+    .state-norm .v-bar { background: rgba(14, 165, 233, 0.3); border-color: var(--attn-cyan); box-shadow: 0 0 15px rgba(14, 165, 233, 0.4); }
+    .state-gamma .v-bar { background: rgba(16, 185, 129, 0.3); border-color: var(--core-green); box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
+
+    .v-val {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      color: #cbd5e1; font-weight: 700; transition: color 0.5s;
+    }
+
+    /* CONTROLS */
+    .controls {
+      display: flex; gap: 15px; margin-top: 30px; align-items: center; justify-content: center;
+      width: 100%;
+    }
+    .btn-step {
+      background: var(--attn-cyan); color: #000; border: none;
+      padding: 12px 24px; border-radius: 6px; font-family: 'JetBrains Mono', monospace;
+      font-weight: 700; font-size: 0.85rem; cursor: pointer; text-transform: uppercase;
+      transition: all 0.3s; box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    }
+    .btn-step:hover { box-shadow: 0 0 30px rgba(14, 165, 233, 0.6); transform: translateY(-2px); }
+    
+    .status-text {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #94a3b8;
+      width: 300px; text-align: left;
+    }
+
+    /* BENTO SPECS */
+    .bento-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
+    @media (max-width: 768px) { .bento-grid { grid-template-columns: 1fr; } }
+
+    .bento-box {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .bento-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .bento-value { font-size: 1rem; color: #fff; font-weight: 400; line-height: 1.5; }
+    .bento-value span.hl { color: var(--attn-cyan); font-weight: 700; }
+
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <button class="btn-back" onclick="window.close()">← Macro Topology</button>
+    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
+      MICRO-MATH <span style="color:#fff; font-weight:600;">//</span> RMS NORM
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    
+    <!-- HEADER -->
+    <div class="math-header">
+      <div class="math-title">Root Mean Square Normalization</div>
+      <div class="formula-box">
+        y<sub>i</sub> = 
+        <span class="formula-hl">x<sub>i</sub></span> / <span style="color:#fff">√</span>( <span class="formula-hl">1/n ∑x²</span> + ε ) 
+        × <span class="formula-gamma">γ<sub>i</sub></span>
+      </div>
+    </div>
+
+    <!-- ANIMATION STAGE -->
+    <div class="stage">
+      <div class="vector-container" id="vecContainer">
+        
+        <div class="rms-line" id="rmsLine">
+          <div class="rms-label" id="rmsLabel">RMS = 0.00</div>
+        </div>
+
+        <!-- Generated via JS -->
+      </div>
+      
+      <div class="controls">
+        <button class="btn-step" id="btnNext" onclick="triggerNext()">Calculate x² ➔</button>
+        <div class="status-text" id="statusText">Raw activations from previous layer. High variance causes mathematical instability.</div>
+      </div>
+    </div>
+
+    <!-- SPECS -->
+    <div class="bento-grid">
+      <div class="bento-box">
+        <div class="bento-label">Why RMSNorm?</div>
+        <div class="bento-value">Standard LayerNorm centers the mean to 0. RMSNorm drops mean-centering entirely. It is <span class="hl">computationally cheaper</span> and equally effective.</div>
+      </div>
+      <div class="bento-box">
+        <div class="bento-label">Epsilon (ε)</div>
+        <div class="bento-value">OLMoE uses <span class="hl">ε = 1e-5</span> to prevent division by zero in case the Root Mean Square approaches exactly zero.</div>
+      </div>
+      <div class="bento-box">
+        <div class="bento-label">Learned Weight (γ)</div>
+        <div class="bento-value">Shape: <span class="hl">[2048]</span>. After forcing the vector into a strict range, the network applies a learned scale parameter (gamma) to restore expressiveness.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // State Data
+    const rawVector = [4.2, -1.8, 8.5, -5.1, 0.9, 3.4];
+    const gamma = [1.2, 0.8, 1.5, 1.1, 0.9, 1.3]; // Mock learned weights
+    
+    // Calculated Data
+    const squared = rawVector.map(x => x * x);
+    const meanSquare = squared.reduce((a, b) => a + b, 0) / squared.length;
+    const rms = Math.sqrt(meanSquare); // approx 4.77
+    const normalized = rawVector.map(x => x / rms);
+    const final = normalized.map((x, i) => x * gamma[i]);
+
+    let step = 0;
+    /*
+      0: Raw
+      1: Squared
+      2: Show RMS Threshold
+      3: Normalized (Divided)
+      4: Applied Gamma
+    */
+
+    const vecContainer = document.getElementById('vecContainer');
+    const rmsLine = document.getElementById('rmsLine');
+    const rmsLabel = document.getElementById('rmsLabel');
+    const btnNext = document.getElementById('btnNext');
+    const statusText = document.getElementById('statusText');
+
+    // UI Scale multiplier so bars fit nicely in 200px height
+    const displayScaleRaw = 15; 
+    const displayScaleNorm = 60; // scale up normalized values so they are visible
+
+    function initBars() {
+      // Remove old bars
+      document.querySelectorAll('.v-bar-wrapper').forEach(e => e.remove());
+      
+      rawVector.forEach((val, idx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'v-bar-wrapper state-raw';
+        wrapper.id = `wrap-${idx}`;
+        
+        const h = Math.abs(val) * displayScaleRaw;
+        const isNeg = val < 0;
+        
+        let barHtml = '';
+        if (isNeg) {
+          barHtml = `
+            <div class="v-val" id="val-${idx}">${val.toFixed(1)}</div>
+            <div style="height: ${h}px; opacity:0; pointer-events:none;"></div> <!-- spacer -->
+            <div class="v-bar negative" id="bar-${idx}" style="height: ${h}px; transform: translateY(100%);"></div>
+          `;
+        } else {
+          barHtml = `
+            <div class="v-bar positive" id="bar-${idx}" style="height: ${h}px;"></div>
+            <div class="v-val" id="val-${idx}">${val.toFixed(1)}</div>
+          `;
+        }
+        
+        wrapper.innerHTML = barHtml;
+        vecContainer.appendChild(wrapper);
+      });
+    }
+
+    initBars();
+
+    function triggerNext() {
+      if (step === 0) {
+        // Step 1: Show Squares
+        rawVector.forEach((val, idx) => {
+          const wrapper = document.getElementById(`wrap-${idx}`);
+          const bar = document.getElementById(`bar-${idx}`);
+          const valTxt = document.getElementById(`val-${idx}`);
+          
+          wrapper.className = 'v-bar-wrapper state-sq';
+          const sqVal = squared[idx];
+          // Scale down the squared visual a bit so it doesn't break the UI
+          bar.style.height = `${(sqVal * 2.5)}px`; 
+          
+          // Squares are always positive, so move negative bars up
+          if (val < 0) {
+            bar.style.transform = `translateY(0)`;
+            bar.classList.remove('negative');
+            bar.classList.add('positive');
+          }
+          
+          valTxt.innerText = sqVal.toFixed(1);
+        });
+
+        statusText.innerHTML = "Step 1: Square all vector elements (<b>x²</b>) to remove negative signs and punish large outliers.";
+        btnNext.innerText = "Compute RMS ➔";
+        step = 1;
+      } 
+      else if (step === 1) {
+        // Step 2: Show RMS Threshold
+        rmsLine.style.opacity = '1';
+        rmsLine.style.bottom = `${(rms * displayScaleRaw) + 40}px`; 
+        rmsLabel.innerText = `RMS = ${rms.toFixed(2)}`;
+
+        statusText.innerHTML = "Step 2: Calculate the Root Mean Square (<b>RMS</b>) of the squared values. This becomes our normalization denominator.";
+        btnNext.innerText = "Normalize (Divide) ➔";
+        step = 2;
+      }
+      else if (step === 2) {
+        // Step 3: Normalize
+        rawVector.forEach((val, idx) => {
+          const wrapper = document.getElementById(`wrap-${idx}`);
+          const bar = document.getElementById(`bar-${idx}`);
+          const valTxt = document.getElementById(`val-${idx}`);
+          
+          wrapper.className = 'v-bar-wrapper state-norm';
+          const normVal = normalized[idx];
+          const h = Math.abs(normVal) * displayScaleNorm;
+          
+          bar.style.height = `${h}px`;
+          
+          // Restore negative positions
+          if (normVal < 0) {
+            bar.style.transform = `translateY(100%)`;
+            bar.classList.remove('positive');
+            bar.classList.add('negative');
+          }
+          
+          valTxt.innerText = normVal.toFixed(2);
+          valTxt.style.color = 'var(--attn-cyan)';
+        });
+
+        rmsLine.style.opacity = '0'; // hide line
+
+        statusText.innerHTML = "Step 3: Divide original <b>x</b> by the <b>RMS</b>. The vector is now strictly bounded, resolving instability.";
+        btnNext.innerText = "Apply Gamma ➔";
+        step = 3;
+      }
+      else if (step === 3) {
+        // Step 4: Apply Gamma
+        rawVector.forEach((val, idx) => {
+          const wrapper = document.getElementById(`wrap-${idx}`);
+          const bar = document.getElementById(`bar-${idx}`);
+          const valTxt = document.getElementById(`val-${idx}`);
+          
+          wrapper.className = 'v-bar-wrapper state-gamma';
+          const finalVal = final[idx];
+          const h = Math.abs(finalVal) * displayScaleNorm;
+          
+          bar.style.height = `${h}px`;
+          
+          valTxt.innerText = finalVal.toFixed(2);
+          valTxt.style.color = 'var(--core-green)';
+        });
+
+        statusText.innerHTML = "Step 4: Multiply by learned <b>γ (Gamma)</b> weights. The tensor is now ready for Attention / MoE.";
+        btnNext.innerText = "Reset Drill Down ↺";
+        btnNext.style.background = 'transparent';
+        btnNext.style.border = '1px solid var(--text-dim)';
+        btnNext.style.color = '#fff';
+        btnNext.style.boxShadow = 'none';
+        step = 4;
+      }
+      else if (step === 4) {
+        // Reset
+        step = 0;
+        rmsLine.style.opacity = '0';
+        rmsLine.style.bottom = '40px';
+        btnNext.innerText = "Calculate x² ➔";
+        btnNext.style.background = 'var(--attn-cyan)';
+        btnNext.style.border = 'none';
+        btnNext.style.color = '#000';
+        btnNext.style.boxShadow = '0 0 20px rgba(14, 165, 233, 0.3)';
+        statusText.innerHTML = "Raw activations from previous layer. High variance causes mathematical instability.";
+        initBars();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Micro-Math // QKV Projections</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #050507;
+      --core-green: #10b981;
+      --attn-cyan: #0ea5e9;
+      --moe-purple: #8b5cf6;
+      --val-orange: #f59e0b;
+      --text-main: #f8fafc;
+      --text-dim: #475569;
+      --glass: rgba(15, 15, 20, 0.6);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-void);
+      color: var(--text-main);
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
+        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh; padding-bottom: 60px;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      width: 100%; height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.8);
+      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex;
+      justify-content: space-between; align-items: center; 
+      backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 200;
+    }
+    .btn-back {
+      background: transparent; color: #94a3b8; border: 1px solid #334155;
+      padding: 8px 18px; font-size: 0.7rem; cursor: pointer; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s;
+      font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    }
+    .btn-back:hover { color: #fff; border-color: var(--attn-cyan); box-shadow: 0 0 15px rgba(14, 165, 233, 0.2); }
+
+    /* LAYOUT */
+    .content-wrapper { width: 100%; max-width: 1100px; padding: 40px 20px; display: flex; flex-direction: column; gap: 30px; }
+
+    /* HEADER & FORMULA */
+    .math-header { text-align: center; margin-bottom: 20px; }
+    .math-title { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; color: var(--attn-cyan); letter-spacing: 2px; margin-bottom: 15px; }
+    .formula-box {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);
+      padding: 20px 40px; border-radius: 8px; display: inline-flex; flex-direction: column; gap: 10px;
+      font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; color: #cbd5e1;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5); text-align: left;
+    }
+    .formula-hl { font-weight: 700; }
+
+    /* ANIMATION STAGE */
+    .stage {
+      background: linear-gradient(180deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.9) 100%);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+      padding: 40px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      display: flex; flex-direction: column; align-items: center; min-height: 400px; justify-content: center;
+    }
+
+    /* VECTORS & TRACKS */
+    .vector-label { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; transition: all 0.5s; opacity: 0; }
+    
+    .track-wrapper {
+      display: flex; flex-direction: column; align-items: center; width: 100%; transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      position: absolute; top: 50%; transform: translateY(-50%);
+    }
+
+    /* Physical 2048 Vector */
+    .vector-bar {
+      display: flex; height: 35px; width: 800px;
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      gap: 0px; /* Changes during splitting */
+    }
+
+    /* 16 Chunks inside the vector */
+    .chunk {
+      flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0);
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex; justify-content: center; align-items: center; overflow: hidden;
+    }
+    .chunk-text { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; opacity: 0; transition: opacity 0.5s; font-weight: bold; color: #fff;}
+
+    /* Colors */
+    .track-q .chunk { background: rgba(14, 165, 233, 0.2); }
+    .track-k .chunk { background: rgba(139, 92, 246, 0.2); }
+    .track-v .chunk { background: rgba(245, 158, 11, 0.2); }
+    
+    .track-input .chunk { background: rgba(16, 185, 129, 0.3); border-color: rgba(16, 185, 129, 0.5); }
+
+    /* STATE 1: Projections */
+    .state-1 .track-input { top: 20%; transform: translateY(-50%) scale(0.8); opacity: 0.5; }
+    .state-1 .track-q { top: 40%; } .state-1 .track-k { top: 60%; } .state-1 .track-v { top: 80%; }
+    .state-1 .vector-label { opacity: 1; }
+    
+    .state-1 .track-q .chunk { border-color: rgba(14, 165, 233, 0.5); box-shadow: inset 0 0 10px rgba(14, 165, 233, 0.2); }
+    .state-1 .track-k .chunk { border-color: rgba(139, 92, 246, 0.5); box-shadow: inset 0 0 10px rgba(139, 92, 246, 0.2); }
+    .state-1 .track-v .chunk { border-color: rgba(245, 158, 11, 0.5); box-shadow: inset 0 0 10px rgba(245, 158, 11, 0.2); }
+
+    /* STATE 2: Shatter into Heads */
+    .state-2 .vector-bar { gap: 6px; width: 950px; }
+    .state-2 .chunk { border-radius: 4px; border-width: 1px; }
+    .state-2 .chunk-text { opacity: 1; }
+    
+    /* STATE 3: Isolate Head 0 */
+    .state-3 .vector-bar { gap: 15px; width: 1000px; }
+    .state-3 .chunk { opacity: 0.1; }
+    .state-3 .chunk.head-0 { opacity: 1; flex: 4; transform: scale(1.1); box-shadow: 0 0 20px currentColor; }
+    .state-3 .chunk-text { font-size: 0.8rem; }
+
+    /* MATMUL OVERLAYS */
+    .matmul-flash {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      font-family: 'JetBrains Mono', monospace; font-size: 2rem; color: #fff;
+      font-weight: bold; opacity: 0; pointer-events: none; transition: all 0.3s;
+      text-shadow: 0 0 30px #fff; z-index: 100;
+    }
+    .matmul-flash.active { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+
+    /* CONTROLS */
+    .controls {
+      display: flex; gap: 15px; margin-top: 30px; align-items: center; justify-content: center; width: 100%;
+    }
+    .btn-step {
+      background: var(--attn-cyan); color: #000; border: none;
+      padding: 12px 24px; border-radius: 6px; font-family: 'JetBrains Mono', monospace;
+      font-weight: 700; font-size: 0.85rem; cursor: pointer; text-transform: uppercase;
+      transition: all 0.3s; box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    }
+    .btn-step:hover { box-shadow: 0 0 30px rgba(14, 165, 233, 0.6); transform: translateY(-2px); }
+    .status-text { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #94a3b8; width: 450px; text-align: left; line-height: 1.5; }
+
+    /* EDITORIAL SECTION */
+    .editorial-section {
+      width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px;
+    }
+    .ed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+    @media (max-width: 900px) { .ed-grid { grid-template-columns: 1fr; } }
+    .ed-col h3 { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #fff; margin-bottom: 15px; letter-spacing: 1px; border-bottom: 1px solid #334; padding-bottom: 8px;}
+    .ed-col p { font-size: 0.85rem; color: #94a3b8; line-height: 1.8; font-weight: 300; margin-bottom: 15px; }
+    .ed-col span.hl { color: #fff; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <button class="btn-back" onclick="window.close()">← Macro Topology</button>
+    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
+      MICRO-MATH <span style="color:#fff; font-weight:600;">//</span> Q, K, V PROJECTION
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    
+    <div class="math-header">
+      <div class="math-title">Linear Slicing & Multi-Head Attention</div>
+      <div class="formula-box">
+        <div><span class="formula-hl" style="color:var(--attn-cyan)">Q</span> = X · W<sub>Q</sub> &nbsp;&nbsp;&nbsp; <span style="font-size: 0.85rem; color: #64748b;">[1, 2048] × [2048, 2048]</span></div>
+        <div><span class="formula-hl" style="color:var(--moe-purple)">K</span> = X · W<sub>K</sub> &nbsp;&nbsp;&nbsp; <span style="font-size: 0.85rem; color: #64748b;">[1, 2048] × [2048, 2048]</span></div>
+        <div><span class="formula-hl" style="color:var(--val-orange)">V</span> = X · W<sub>V</sub> &nbsp;&nbsp;&nbsp; <span style="font-size: 0.85rem; color: #64748b;">[1, 2048] × [2048, 2048]</span></div>
+      </div>
+    </div>
+
+    <!-- ANIMATION STAGE -->
+    <div class="stage" id="animStage">
+      
+      <div class="matmul-flash" id="flashMatmul">× W_Q, W_K, W_V</div>
+
+      <!-- INPUT TENSOR -->
+      <div class="track-wrapper track-input" id="t-input">
+        <div class="vector-label" style="opacity: 1; color: var(--core-green)">Input Tensor X [Dim: 2048]</div>
+        <div class="vector-bar" id="bar-input"></div>
+      </div>
+
+      <!-- Q TENSOR -->
+      <div class="track-wrapper track-q" id="t-q" style="opacity: 0;">
+        <div class="vector-label" style="color: var(--attn-cyan)">Queries (Q) [Dim: 2048]</div>
+        <div class="vector-bar" id="bar-q"></div>
+      </div>
+
+      <!-- K TENSOR -->
+      <div class="track-wrapper track-k" id="t-k" style="opacity: 0;">
+        <div class="vector-label" style="color: var(--moe-purple)">Keys (K) [Dim: 2048]</div>
+        <div class="vector-bar" id="bar-k"></div>
+      </div>
+
+      <!-- V TENSOR -->
+      <div class="track-wrapper track-v" id="t-v" style="opacity: 0;">
+        <div class="vector-label" style="color: var(--val-orange)">Values (V) [Dim: 2048]</div>
+        <div class="vector-bar" id="bar-v"></div>
+      </div>
+      
+    </div>
+
+    <div class="controls">
+      <button class="btn-step" id="btnNext" onclick="triggerNext()">Project Q, K, V ➔</button>
+      <div class="status-text" id="statusText">
+        <b>Step 0:</b> The token arrives as a single 2048-dimensional vector from the LayerNorm.
+      </div>
+    </div>
+
+    <!-- EDITORIAL -->
+    <div class="editorial-section">
+      <div class="ed-grid">
+        <div class="ed-col">
+          <h3 style="color: var(--attn-cyan);">THE COCKTAIL PARTY (Q, K, V)</h3>
+          <p>Think of Attention like a cocktail party.</p>
+          <p><b>Query (Q):</b> What I am looking for (e.g., "I need a verb to attach to").</p>
+          <p><b>Key (K):</b> What I have to offer (e.g., "I am an action verb").</p>
+          <p><b>Value (V):</b> What I actually mean (My underlying semantic payload).</p>
+          <p>When Q and K multiply, they create an affinity score. High scores mean V is passed along.</p>
+        </div>
+        <div class="ed-col">
+          <h3 style="color: var(--moe-purple);">WHY MULTI-HEAD?</h3>
+          <p>If the model only had one massive 2048D head, it could only focus on one type of relationship at a time.</p>
+          <p>By shattering the vector into <span class="hl">16 separate heads</span>, the network can process 16 different perspectives simultaneously. Head 0 might track pronoun references (He -> John), Head 1 might track grammar, and Head 2 might track geographical entities.</p>
+        </div>
+        <div class="ed-col">
+          <h3 style="color: var(--val-orange);">THE DIMENSIONAL MATH</h3>
+          <p>OLMoE-1B-7B has a model dimension  of <span class="hl">2048</span>.</p>
+          <p>It uses <span class="hl">16</span> attention heads.</p>
+          <p>Therefore, the dimension of each head  is exactly 2048 / 16 = <span class="hl">128</span>.</p>
+          <p>This slicing requires no extra parameters. It is purely a reshape operation: <span class="hl">[1, 2048] ➔ [1, 16, 128]</span>.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const stage = document.getElementById('animStage');
+    const flash = document.getElementById('flashMatmul');
+    const btnNext = document.getElementById('btnNext');
+    const statusText = document.getElementById('statusText');
+
+    // Build the 16 chunks inside each vector bar
+    const bars = ['input', 'q', 'k', 'v'];
+    bars.forEach(b => {
+      const container = document.getElementById(`bar-${b}`);
+      for(let i = 0; i < 16; i++) {
+        const chunk = document.createElement('div');
+        chunk.className = `chunk ${i === 0 ? 'head-0' : ''}`;
+        
+        const txt = document.createElement('div');
+        txt.className = 'chunk-text';
+        txt.innerText = `H${i}`;
+        
+        chunk.appendChild(txt);
+        container.appendChild(chunk);
+      }
+    });
+
+    let step = 0;
+
+    function triggerNext() {
+      if (step === 0) {
+        // MATMUL FLASH
+        flash.classList.add('active');
+        setTimeout(() => flash.classList.remove('active'), 600);
+
+        // Transition to 3 separate vectors
+        document.getElementById('t-q').style.opacity = '1';
+        document.getElementById('t-k').style.opacity = '1';
+        document.getElementById('t-v').style.opacity = '1';
+        stage.classList.add('state-1');
+        
+        statusText.innerHTML = "<b>Step 1:</b> The input is multiplied by 3 separate matrices ($W_Q, W_K, W_V$), yielding three distinct 2048D vectors representing the Query, Key, and Value.";
+        btnNext.innerText = "Shatter into 16 Heads ➔";
+        step = 1;
+      }
+      else if (step === 1) {
+        // Shatter
+        stage.classList.add('state-2');
+        
+        document.querySelectorAll('.track-q .vector-label')[0].innerText = "Queries (Q) [Shape: 16 × 128]";
+        document.querySelectorAll('.track-k .vector-label')[0].innerText = "Keys (K) [Shape: 16 × 128]";
+        document.querySelectorAll('.track-v .vector-label')[0].innerText = "Values (V) [Shape: 16 × 128]";
+
+        statusText.innerHTML = "<b>Step 2:</b> The vectors are logically sliced into 16 distinct Attention Heads. Each head is now 128 dimensions (2048 / 16).";
+        btnNext.innerText = "Isolate Head 0 ➔";
+        step = 2;
+      }
+      else if (step === 2) {
+        // Isolate Head 0
+        stage.classList.add('state-3');
+        document.querySelectorAll('.head-0 .chunk-text').forEach(el => el.innerText = "128-Dim");
+
+        statusText.innerHTML = "<b>Step 3:</b> Head 0 now has its own isolated Q, K, and V (all 128-D). It will now perform Attention completely independently of the other 15 heads.";
+        
+        btnNext.innerText = "Reset Drill Down ↺";
+        btnNext.style.background = 'transparent';
+        btnNext.style.border = '1px solid var(--text-dim)';
+        btnNext.style.color = '#fff';
+        btnNext.style.boxShadow = 'none';
+        step = 3;
+      }
+      else if (step === 3) {
+        // Reset
+        stage.classList.remove('state-1', 'state-2', 'state-3');
+        document.getElementById('t-q').style.opacity = '0';
+        document.getElementById('t-k').style.opacity = '0';
+        document.getElementById('t-v').style.opacity = '0';
+        
+        document.querySelectorAll('.track-q .vector-label')[0].innerText = "Queries (Q) [Dim: 2048]";
+        document.querySelectorAll('.track-k .vector-label')[0].innerText = "Keys (K) [Dim: 2048]";
+        document.querySelectorAll('.track-v .vector-label')[0].innerText = "Values (V) [Dim: 2048]";
+        document.querySelectorAll('.head-0 .chunk-text').forEach(el => el.innerText = "H0");
+
+        statusText.innerHTML = "<b>Step 0:</b> The token arrives as a single 2048-dimensional vector from the LayerNorm.";
+        btnNext.innerText = "Project Q, K, V ➔";
+        btnNext.style.background = 'var(--attn-cyan)';
+        btnNext.style.border = 'none';
+        btnNext.style.color = '#000';
+        btnNext.style.boxShadow = '0 0 20px rgba(14, 165, 233, 0.3)';
+        step = 0;
+      }
+    }
+  </script>
+</body>
+</html>

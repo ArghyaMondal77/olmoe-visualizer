@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OLMoE Execution Pipeline // Neural Network Visualizer</title>
+  
+  <!-- Premium Technical Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Space+Grotesk:wght@400;500;600;700&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+  
+  <!-- CDN Libraries: Three.js & GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <style>
+    /* ==========================================================================
+       DESIGN PHILOSOPHY: ANTI-AI SLOP / DEEP SPACE & HARDWARE INSTRUMENTATION
+       ========================================================================== */
+    :root {
+      /* Void & Chassis Surfaces */
+      --bg-void: #06070a;
+      --bg-chassis: #0d0f15;
+      --bg-surface: #12151f;
+      --bg-recessed: #08090d;
+      
+      /* Precision Metallic & Instrumental Accents */
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --border-medium: rgba(255, 255, 255, 0.12);
+      --border-focus: rgba(56, 189, 248, 0.4);
+      
+      /* Telemetry Accents (Controlled, High-contrast, Never Over-blown) */
+      --glow-cyan: #38bdf8;
+      --glow-cyan-dim: rgba(56, 189, 248, 0.15);
+      --glow-green: #10b981;
+      --glow-green-dim: rgba(16, 185, 129, 0.15);
+      --glow-orange: #f59e0b;
+      --glow-orange-dim: rgba(245, 158, 11, 0.18);
+      --glow-purple: #a855f7;
+      --glow-purple-dim: rgba(168, 85, 247, 0.18);
+      
+      /* Typography Colors */
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --text-dark: #334155;
+      
+      /* Hardware Conduit & Buses */
+      --bus-line: rgba(255, 255, 255, 0.08);
+      --bus-track: #090a0f;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background-color: var(--bg-void);
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Fixed Three.js Background Canvas */
+    #bg-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 30%, #0d111a 0%, #06070a 100%);
+    }
+
+    /* Cinematic Vignette Overlay */
+    .bg-vignette {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      pointer-events: none;
+      background: 
+        radial-gradient(circle at 50% 15%, transparent 40%, rgba(6, 7, 10, 0.85) 90%),
+        linear-gradient(180deg, rgba(6,7,10,0.2) 0%, rgba(6,7,10,0.6) 100%);
+    }
+
+    /* Subtle Technical Grid Matrix */
+    .bg-grid {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 2;
+      pointer-events: none;
+      background-size: 60px 60px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
+    }
+
+    /* ==========================================================================
+       TOP CONTROL BAR & INSTRUMENTATION HUD
+       ========================================================================== */
+    .top-bar {
+      width: 100%;
+      padding: 18px 36px;
+      background: rgba(10, 12, 17, 0.82);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6);
+    }
+
+    .top-bar-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500;
+    }
+
+    .meta-indicator {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--glow-cyan);
+      box-shadow: 0 0 8px var(--glow-cyan);
+    }
+
+    .original-prompt {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      color: #fff;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      text-align: center;
+      max-width: 860px;
+      line-height: 1.4;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 10px 22px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .original-prompt span {
+      color: var(--glow-cyan);
+      font-weight: 600;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .controls {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Precision Buttons */
+    button {
+      padding: 10px 22px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid transparent;
+      outline: none;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .btn-next {
+      background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+      color: #03131e;
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 
+        0 4px 14px -2px rgba(14, 165, 233, 0.4),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+    }
+
+    .btn-next:hover:not(:disabled) {
+      background: linear-gradient(180deg, #7dd3fc 0%, #0ea5e9 100%);
+      box-shadow: 
+        0 6px 18px -2px rgba(14, 165, 233, 0.55),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .btn-next:disabled {
+      background: #151a24;
+      color: var(--text-dim);
+      border-color: var(--border-subtle);
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+      border: 1px solid var(--border-medium);
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .btn-reset:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.3);
+      color: #fff;
+    }
+
+    .btn-generate {
+      background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+      color: #160a00;
+      border-color: rgba(255, 255, 255, 0.25);
+      box-shadow: 
+        0 4px 16px -2px rgba(245, 158, 11, 0.4),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+      display: none;
+    }
+
+    .btn-generate:hover {
+      background: linear-gradient(180deg, #fbbf24 0%, #ea580c 100%);
+      box-shadow: 
+        0 6px 20px -2px rgba(245, 158, 11, 0.6),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+      transform: translateY(-1px);
+    }
+
+    /* ==========================================================================
+       RESPONSIVE PIPELINE ARCHITECTURE (CORE RESPONSIVE FIX)
+       ========================================================================== */
+    .pipeline-container {
+      flex: 1;
+      display: flex;
+      position: relative;
+      z-index: 10;
+      transition: all 0.3s ease;
+    }
+
+    /* --- DESKTOP / LAPTOP (Horizontal LTR Pipeline) --- */
+    @media (min-width: 1024px) {
+      .pipeline-container {
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        padding: 60px 48px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        min-height: calc(100vh - 135px);
+      }
+
+      .pipeline-container::-webkit-scrollbar {
+        height: 7px;
+      }
+      .pipeline-container::-webkit-scrollbar-track {
+        background: rgba(10, 12, 17, 0.8);
+      }
+      .pipeline-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .pipeline-container::-webkit-scrollbar-thumb:hover {
+        background: var(--glow-cyan);
+      }
+
+      /* Horizontal Connectors */
+      .connector-main {
+        width: 54px;
+        height: 4px;
+        margin: 0;
+      }
+      .connector-main .signal {
+        height: 100%;
+        width: 28px;
+        left: -30px;
+        top: 0;
+        animation: signalX 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      .layers-machine {
+        width: 520px;
+        height: 275px;
+      }
+
+      .scroller-window {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        align-items: center;
+      }
+
+      .layer-wrapper {
+        flex-direction: row;
+      }
+
+      .layer-conn {
+        width: 26px;
+        height: 3px;
+      }
+      .layer-conn .l-signal {
+        height: 100%;
+        width: 50%;
+        left: -50%;
+        top: 0;
+        animation: signalX 0.6s linear infinite;
+      }
+    }
+
+    /* --- MOBILE / TABLET (Snaps into Vertical Timeline) --- */
+    @media (max-width: 1023px) {
+      .top-bar {
+        padding: 16px 20px;
+        gap: 12px;
+      }
+      .original-prompt {
+        font-size: 0.95rem;
+        padding: 8px 16px;
+      }
+      button {
+        padding: 9px 18px;
+        font-size: 0.75rem;
+      }
+
+      .pipeline-container {
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 36px 16px 80px;
+        width: 100%;
+        max-width: 440px;
+        margin: 0 auto;
+        overflow-x: hidden;
+      }
+
+      .machine {
+        width: 100% !important;
+        max-width: 380px;
+      }
+
+      /* Vertical Downward Connectors (Rotated 90 degrees) */
+      .connector-main {
+        width: 4px !important;
+        height: 44px !important;
+        margin: 0 auto;
+      }
+      .connector-main .signal {
+        width: 100% !important;
+        height: 24px !important;
+        top: -26px !important;
+        left: 0 !important;
+        animation: signalY 1s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+      }
+
+      .layers-machine {
+        width: 100% !important;
+        max-width: 380px !important;
+        height: 420px !important;
+      }
+
+      .scroller-window {
+        flex-direction: column !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        align-items: center !important;
+        gap: 0 !important;
+        padding: 14px 10px !important;
+      }
+
+      .layer-wrapper {
+        flex-direction: column !important;
+        align-items: center !important;
+        width: 100% !important;
+      }
+
+      .layer-node {
+        width: 100% !important;
+        max-width: 220px !important;
+        padding: 12px 10px !important;
+      }
+
+      .layer-conn {
+        width: 3px !important;
+        height: 20px !important;
+      }
+      .layer-conn .l-signal {
+        width: 100% !important;
+        height: 50% !important;
+        top: -50% !important;
+        left: 0 !important;
+        animation: signalY 0.5s linear infinite !important;
+      }
+    }
+
+    /* Signal Animations */
+    @keyframes signalX {
+      0% { left: -30px; opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { left: 100%; opacity: 0; }
+    }
+
+    @keyframes signalY {
+      0% { top: -30px; opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* ==========================================================================
+       MAIN CONNECTORS (Hardware Bus Conduit)
+       ========================================================================== */
+    .connector {
+      position: relative;
+      background: var(--bus-track);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.9);
+      flex-shrink: 0;
+      border-radius: 2px;
+    }
+
+    .signal {
+      position: absolute;
+      background: linear-gradient(90deg, transparent, var(--glow-cyan), #ffffff, var(--glow-cyan), transparent);
+      box-shadow: 0 0 10px var(--glow-cyan);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      border-radius: 2px;
+    }
+
+    .connector.active .signal {
+      opacity: 1;
+    }
+
+    /* ==========================================================================
+       HARDWARE MACHINES (Chassis & Cards)
+       ========================================================================== */
+    .machine {
+      background: linear-gradient(180deg, rgba(20, 24, 33, 0.92) 0%, rgba(12, 14, 20, 0.97) 100%);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 22px;
+      width: 290px;
+      flex-shrink: 0;
+      box-shadow: 
+        0 20px 40px -10px rgba(0, 0, 0, 0.75),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: 
+        border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.3s ease;
+    }
+
+    .machine.active {
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 
+        0 24px 50px -10px rgba(0, 0, 0, 0.85),
+        0 0 25px -4px rgba(56, 189, 248, 0.15),
+        inset 0 1px 0 0 rgba(56, 189, 248, 0.35);
+    }
+
+    .machine.done {
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 
+        0 20px 45px -10px rgba(0, 0, 0, 0.8),
+        0 0 20px -5px rgba(16, 185, 129, 0.12),
+        inset 0 1px 0 0 rgba(16, 185, 129, 0.3);
+    }
+
+    /* Machine Header & LED Indicators */
+    .machine-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 12px;
+    }
+
+    .machine-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .status-light {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #242938;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);
+      transition: all 0.35s ease;
+    }
+
+    .machine.active .status-light {
+      background: var(--glow-cyan);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25), 0 0 10px var(--glow-cyan);
+    }
+
+    .machine.done .status-light {
+      background: var(--glow-green);
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25), 0 0 10px var(--glow-green);
+    }
+
+    /* Zoom Button */
+    .zoom-btn {
+      background: rgba(56, 189, 248, 0.05);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--glow-cyan);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.25s ease;
+      box-shadow: none;
+    }
+
+    .zoom-btn:hover {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: var(--glow-cyan);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+
+    /* ==========================================================================
+       GLASS WINDOW & FLYING TOKEN TRANSFORM PHYSICS
+       ========================================================================== */
+    .glass-window {
+      background: linear-gradient(180deg, #07090d 0%, #0c0e14 100%);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      height: 125px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      box-shadow: 
+        inset 0 3px 12px rgba(0,0,0,0.85),
+        inset 0 0 0 1px rgba(0,0,0,0.5);
+    }
+
+    /* High-Precision Hardware Flying Token */
+    .flying-token {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate3d(-150%, -50%, 0) scale(0.85);
+      padding: 10px 18px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #151924 0%, #0d1017 100%);
+      border: 1px solid var(--border-medium);
+      box-shadow: 
+        0 12px 28px -5px rgba(0, 0, 0, 0.85),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+      transition: 
+        transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.32s ease,
+        border-color 0.35s ease,
+        background 0.35s ease,
+        box-shadow 0.35s ease;
+      will-change: transform, opacity, box-shadow;
+    }
+
+    .flying-token.fly-in {
+      transform: translate3d(-50%, -50%, 0) scale(1.04);
+      opacity: 1;
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 
+        0 14px 32px -4px rgba(0, 0, 0, 0.9),
+        0 0 18px -3px rgba(56, 189, 248, 0.2),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .flying-token.glow {
+      border-color: rgba(56, 189, 248, 0.75);
+      background: linear-gradient(135deg, #182236 0%, #0e1524 100%);
+      box-shadow: 
+        0 16px 36px -4px rgba(0, 0, 0, 0.95),
+        0 0 25px 0px rgba(56, 189, 248, 0.3),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
+        inset 0 0 12px rgba(56, 189, 248, 0.15);
+      transform: translate3d(-50%, -50%, 0) scale(1.07);
+    }
+
+    .flying-token.fly-out {
+      transform: translate3d(120%, -50%, 0) scale(0.88);
+      opacity: 0;
+      transition: 
+        transform 0.32s cubic-bezier(0.7, 0, 0.84, 0),
+        opacity 0.25s ease;
+    }
+
+    .token-word {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+
+    .token-data {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--glow-cyan);
+      margin-top: 5px;
+      font-weight: 400;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      letter-spacing: 0.02em;
+    }
+
+    .flying-token.glow .token-data {
+      opacity: 1;
+    }
+
+    /* ==========================================================================
+       16 LAYERS RACK (Decoder Stack)
+       ========================================================================== */
+    .scroller-window {
+      flex: 1;
+      background: #080a0e;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      scroll-behavior: smooth;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.7);
+    }
+
+    .scroller-window::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scroller-window::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.5);
+      border-radius: 3px;
+    }
+    .scroller-window::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 3px;
+    }
+    .scroller-window::-webkit-scrollbar-thumb:hover {
+      background: var(--glow-cyan);
+    }
+
+    .layer-wrapper {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .layer-node {
+      width: 115px;
+      padding: 14px 10px;
+      background: #0e1118;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      text-align: center;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .layer-node .l-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 0.03em;
+    }
+
+    .layer-node .l-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      color: #475569;
+      margin-top: 4px;
+      font-weight: 300;
+    }
+
+    .layer-node.active {
+      border-color: var(--glow-cyan);
+      background: rgba(56, 189, 248, 0.08);
+      box-shadow: 
+        0 0 18px -2px rgba(56, 189, 248, 0.25),
+        inset 0 1px 0 0 rgba(56, 189, 248, 0.35);
+    }
+    .layer-node.active .l-title {
+      color: var(--glow-cyan);
+    }
+
+    .layer-node.processed {
+      border-color: rgba(16, 185, 129, 0.45);
+      background: rgba(16, 185, 129, 0.04);
+      cursor: pointer;
+    }
+    .layer-node.processed:hover {
+      border-color: var(--glow-green);
+      background: rgba(16, 185, 129, 0.1);
+      transform: translateY(-2px);
+    }
+    .layer-node.processed .l-title {
+      color: #34d399;
+    }
+    .layer-node.processed .l-sub {
+      color: #10b981;
+      opacity: 0.8;
+    }
+
+    .layer-conn {
+      background: var(--bus-track);
+      border: 1px solid var(--border-subtle);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .layer-conn .l-signal {
+      position: absolute;
+      background: var(--glow-cyan);
+      box-shadow: 0 0 8px var(--glow-cyan);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .layer-conn.active .l-signal {
+      opacity: 1;
+    }
+
+    /* ==========================================================================
+       LM HEAD & PROBABILITY LOGITS
+       ========================================================================== */
+    .lm-probs-container {
+      background: #080a0e;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.45s ease;
+      flex: 1;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.7);
+    }
+
+    .lm-probs-container.visible {
+      opacity: 1;
+    }
+
+    .prob-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.74rem;
+      padding: 7px 11px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 5px;
+      border: 1px solid var(--border-subtle);
+      color: #cbd5e1;
+      transition: all 0.2s ease;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .prob-row.winner {
+      border-color: rgba(16, 185, 129, 0.55);
+      background: rgba(16, 185, 129, 0.08);
+      color: #34d399;
+      font-weight: 600;
+      box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.2);
+    }
+
+    .prob-dim {
+      text-align: center;
+      font-size: 0.65rem;
+      color: #64748b;
+      margin-top: 6px;
+      font-style: italic;
+      letter-spacing: 0.02em;
+    }
+
+    /* ==========================================================================
+       OUTPUT CHASSIS & FINAL CARD
+       ========================================================================== */
+    .output-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      opacity: 0;
+      transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      flex: 1;
+      justify-content: center;
+    }
+
+    .output-container.visible {
+      opacity: 1;
+    }
+
+    .final-token-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(5, 46, 35, 0.1) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 
+        0 10px 25px -5px rgba(16, 185, 129, 0.15),
+        inset 0 1px 0 0 rgba(16, 185, 129, 0.25);
+    }
+
+    .final-word {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.5rem;
+      color: #34d399;
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .final-id {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      letter-spacing: 0.05em;
+    }
+
+    .final-sentence {
+      background: #080a0e;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+    }
+
+    /* ==========================================================================
+       SUMMARY BUTTONS & 16-LAYER TELEMETRY MODAL
+       ========================================================================== */
+    .summary-btn {
+      width: 100%;
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      font-size: 0.72rem;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      opacity: 0;
+      pointer-events: none;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+
+    .machine.done .summary-btn {
+      opacity: 1;
+      pointer-events: auto;
+      cursor: pointer;
+      border-color: rgba(56, 189, 248, 0.25);
+      color: #cbd5e1;
+    }
+
+    .machine.done .summary-btn:hover {
+      background: rgba(56, 189, 248, 0.08);
+      color: #fff;
+      border-color: var(--glow-cyan);
+      box-shadow: 0 0 15px -3px rgba(56, 189, 248, 0.25);
+    }
+
+    /* Modal Backdrop with Cinematic Blur */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(5, 7, 10, 0.76);
+      backdrop-filter: blur(24px) saturate(180%) brightness(0.7);
+      -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Modal Chassis Container */
+    .modal-content {
+      background: linear-gradient(180deg, #12151e 0%, #0a0c12 100%);
+      border: 1px solid var(--border-medium);
+      box-shadow: 
+        0 25px 65px -10px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 28px;
+      width: 95%;
+      max-width: 940px;
+      max-height: 86vh;
+      overflow-y: auto;
+      transform: translateY(28px) scale(0.97);
+      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+    }
+
+    .modal-overlay.active .modal-content {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-content::-webkit-scrollbar {
+      width: 7px;
+    }
+    .modal-content::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 4px;
+    }
+    .modal-content::-webkit-scrollbar-thumb {
+      background: var(--glow-cyan);
+      border-radius: 4px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 14px;
+    }
+
+    .modal-header h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.6rem;
+      cursor: pointer;
+      transition: color 0.25s ease;
+      line-height: 1;
+      padding: 4px;
+    }
+
+    .close-btn:hover {
+      color: var(--glow-orange);
+    }
+
+    /* Modal Data Rows */
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: #080a0e;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .data-word {
+      font-weight: 600;
+      color: #f1f5f9;
+      font-size: 0.82rem;
+    }
+
+    .data-value {
+      font-size: 0.78rem;
+    }
+
+    .layer-vector-box {
+      background: #08090d;
+      border: 1px solid var(--border-subtle);
+      padding: 14px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+    }
+    .layer-vector-box.out {
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+    .vector-text {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .vector-text span {
+      color: var(--glow-cyan);
+    }
+
+    /* ==========================================================================
+       HEATMAPS & MOE ROUTING IN LAYER MODAL
+       ========================================================================== */
+    .layer-modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      gap: 28px;
+    }
+
+    .lm-section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--glow-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
+      border-bottom: 1px dashed var(--border-medium);
+      padding-bottom: 8px;
+    }
+
+    /* 16 Attention Head Heatmaps */
+    .heatmaps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .head-card {
+      background: #080a0e;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .head-card:hover {
+      border-color: rgba(56, 189, 248, 0.35);
+      background: #0c0f16;
+      transform: translateY(-2px);
+    }
+
+    .head-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    .mini-heatmap {
+      display: grid;
+      gap: 2px;
+      background: #050608;
+      border: 1px solid var(--border-subtle);
+      padding: 3px;
+      border-radius: 4px;
+    }
+
+    .hm-cell {
+      width: 10px;
+      height: 10px;
+      background: #151a24;
+      border-radius: 2px;
+      transition: transform 0.2s ease, background 0.25s ease;
+      cursor: crosshair;
+    }
+
+    .hm-cell:hover {
+      transform: scale(1.35);
+      z-index: 5;
+    }
+
+    /* MoE Top 8 Routing Panel */
+    .moe-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .moe-row {
+      display: flex;
+      align-items: center;
+      background: #080a0e;
+      border: 1px solid var(--border-subtle);
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .moe-row:hover {
+      border-color: rgba(168, 85, 247, 0.35);
+      background: rgba(168, 85, 247, 0.04);
+    }
+
+    .moe-id {
+      font-size: 0.74rem;
+      font-weight: 500;
+      color: var(--text-main);
+      width: 48px;
+    }
+
+    .moe-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: #050608;
+      border-radius: 3px;
+      margin: 0 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .moe-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #a855f7);
+      border-radius: 3px;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.45);
+    }
+
+    .moe-val {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #c084fc;
+      width: 45px;
+      text-align: right;
+    }
+
+    /* Fallback CSS Staggered Entrance Animations */
+    @keyframes cardEntrance {
+      0% {
+        opacity: 0;
+        transform: translateY(14px) scale(0.95);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .modal-overlay.active .head-card {
+      animation: cardEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .modal-overlay.active .head-card:nth-child(1)  { animation-delay: 0.02s; }
+    .modal-overlay.active .head-card:nth-child(2)  { animation-delay: 0.04s; }
+    .modal-overlay.active .head-card:nth-child(3)  { animation-delay: 0.06s; }
+    .modal-overlay.active .head-card:nth-child(4)  { animation-delay: 0.08s; }
+    .modal-overlay.active .head-card:nth-child(5)  { animation-delay: 0.10s; }
+    .modal-overlay.active .head-card:nth-child(6)  { animation-delay: 0.12s; }
+    .modal-overlay.active .head-card:nth-child(7)  { animation-delay: 0.14s; }
+    .modal-overlay.active .head-card:nth-child(8)  { animation-delay: 0.16s; }
+    .modal-overlay.active .head-card:nth-child(9)  { animation-delay: 0.18s; }
+    .modal-overlay.active .head-card:nth-child(10) { animation-delay: 0.20s; }
+    .modal-overlay.active .head-card:nth-child(11) { animation-delay: 0.22s; }
+    .modal-overlay.active .head-card:nth-child(12) { animation-delay: 0.24s; }
+    .modal-overlay.active .head-card:nth-child(13) { animation-delay: 0.26s; }
+    .modal-overlay.active .head-card:nth-child(14) { animation-delay: 0.28s; }
+    .modal-overlay.active .head-card:nth-child(15) { animation-delay: 0.30s; }
+    .modal-overlay.active .head-card:nth-child(16) { animation-delay: 0.32s; }
+
+    .modal-overlay.active .moe-row {
+      animation: cardEntrance 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .modal-overlay.active .moe-row:nth-child(1) { animation-delay: 0.08s; }
+    .modal-overlay.active .moe-row:nth-child(2) { animation-delay: 0.12s; }
+    .modal-overlay.active .moe-row:nth-child(3) { animation-delay: 0.16s; }
+    .modal-overlay.active .moe-row:nth-child(4) { animation-delay: 0.20s; }
+    .modal-overlay.active .moe-row:nth-child(5) { animation-delay: 0.24s; }
+    .modal-overlay.active .moe-row:nth-child(6) { animation-delay: 0.28s; }
+    .modal-overlay.active .moe-row:nth-child(7) { animation-delay: 0.32s; }
+    .modal-overlay.active .moe-row:nth-child(8) { animation-delay: 0.36s; }
+  </style>
+</head>
+<body>
+
+  <!-- THREE.JS CINEMATIC DATA COSMOS CANVAS -->
+  <canvas id="bg-canvas"></canvas>
+  <div class="bg-vignette"></div>
+  <div class="bg-grid"></div>
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="top-bar-meta">
+      <span class="meta-indicator"></span>
+      <span>OLMoE-1B-7B // NEURAL EXECUTION HARNESS</span>
+    </div>
+    <div class="original-prompt" id="display-prompt">"Loading telemetry.json..."</div>
+    <div class="controls">
+      <button class="btn-reset" onclick="hardResetPipeline()">Reset Process</button>
+      <button class="btn-next" id="btnNext" onclick="triggerNext()" disabled>Loading Data...</button>
+      <button class="btn-generate" id="btnGenerate" onclick="generateNextWord()">Generate Next Word ➔</button>
+    </div>
+  </div>
+
+  <!-- PIPELINE CONTAINER -->
+  <div class="pipeline-container" id="pipe-container">
+    
+    <!-- 1. TOKENIZER -->
+    <div class="machine" id="mach-tokenizer">
+      <div class="machine-header">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <span class="machine-title">Tokenizer</span>
+          <button class="zoom-btn" onclick="window.open('tokenizer-zoom.html', '_blank')">⤢ ZOOM</button>
+        </div>
+        <div class="status-light"></div>
+      </div>
+      <div class="glass-window">
+        <div class="flying-token" id="tok-token">
+          <div class="token-word" id="tok-word">Word</div>
+          <div class="token-data" id="tok-id">ID: 0000</div>
+        </div>
+      </div>
+      <button class="summary-btn" onclick="showTokenizerSummary()">View ID Summary</button>
+    </div>
+
+    <div class="connector connector-main" id="conn-1"><div class="signal"></div></div>
+
+    <!-- 2. EMBEDDING -->
+    <div class="machine" id="mach-embedding">
+      <div class="machine-header">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <span class="machine-title">Embedding (W_E)</span>
+          <button class="zoom-btn" onclick="window.open('embedding-zoom.html', '_blank')">⤢ ZOOM</button>
+        </div>
+        <div class="status-light"></div>
+      </div>
+      <div class="glass-window">
+        <div class="flying-token" id="emb-token">
+          <div class="token-word" id="emb-word">ID</div>
+          <div class="token-data" id="emb-vec" style="font-size: 0.6rem;">[0.00, 0.00... ]</div>
+        </div>
+      </div>
+      <button class="summary-btn" onclick="showEmbeddingSummary()">View Vector Summary</button>
+    </div>
+
+    <div class="connector connector-main" id="conn-2"><div class="signal"></div></div>
+
+    <!-- 3. 16 LAYERS RACK -->
+    <div class="machine layers-machine" id="mach-layers">
+      <div class="machine-header">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <span class="machine-title">16x Decoder Blocks</span>
+          <button class="zoom-btn" onclick="window.open('layer-zoom.html', '_blank')">⤢ ZOOM</button>
+        </div>
+        <div class="status-light"></div>
+      </div>
+      <div class="scroller-window" id="layers-track"></div>
+    </div>
+
+    <div class="connector connector-main" id="conn-3"><div class="signal"></div></div>
+
+    <!-- 4. LM HEAD (Probabilities) -->
+    <div class="machine" id="mach-lmhead">
+      <div class="machine-header">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <span class="machine-title">LM Head Output</span>
+          <button class="zoom-btn" onclick="window.open('lm-head-zoom.html', '_blank')">⤢ ZOOM</button>
+        </div>
+        <div class="status-light"></div>
+      </div>
+      <div class="lm-probs-container" id="lm-probs"></div>
+    </div>
+
+    <div class="connector connector-main" id="conn-4"><div class="signal"></div></div>
+
+    <!-- 5. FINAL OUTPUT -->
+    <div class="machine" id="mach-output">
+      <div class="machine-header"><span class="machine-title">Generated Token</span><div class="status-light"></div></div>
+      <div class="output-container" id="out-container">
+        <div class="final-token-card">
+          <div class="final-word" id="final-word-text"></div>
+          <div class="final-id" id="final-id-text"></div>
+        </div>
+        <div class="final-sentence" id="final-sentence-text"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title" style="color:var(--glow-cyan)">Summary</h3>
+        <button class="close-btn" onclick="closeModal()">×</button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- THREE.JS CINEMATIC DATA COSMOS ENGINE -->
+  <script>
+    (function initThreeBackground() {
+      const canvas = document.getElementById('bg-canvas');
+      if (!canvas || typeof THREE === 'undefined') return;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 3000);
+      camera.position.z = 850;
+
+      const renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance'
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+      // Circular Photon Particle Texture Generator (Pure In-Memory Canvas)
+      function createPhotonTexture() {
+        const size = 64;
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+        const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.2, 'rgba(186, 230, 253, 0.9)');
+        grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.35)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+        ctx.fill();
+        return new THREE.CanvasTexture(c);
+      }
+
+      const photonTexture = createPhotonTexture();
+
+      // 1. Deep Space Starfield
+      const starCount = 1800;
+      const starGeo = new THREE.BufferGeometry();
+      const starPos = new Float32Array(starCount * 3);
+      const starCols = new Float32Array(starCount * 3);
+
+      const colorPalette = [
+        new THREE.Color(0xf1f5f9), // cold platinum
+        new THREE.Color(0x38bdf8), // icy cyan
+        new THREE.Color(0x818cf8), // violet
+        new THREE.Color(0x94a3b8), // slate
+        new THREE.Color(0xfbbf24)  // tungsten amber
+      ];
+
+      for (let i = 0; i < starCount; i++) {
+        const i3 = i * 3;
+        starPos[i3] = (Math.random() - 0.5) * 2400;
+        starPos[i3 + 1] = (Math.random() - 0.5) * 1800;
+        starPos[i3 + 2] = (Math.random() - 0.5) * 2000;
+
+        const col = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        starCols[i3] = col.r;
+        starCols[i3 + 1] = col.g;
+        starCols[i3 + 2] = col.b;
+      }
+
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      starGeo.setAttribute('color', new THREE.BufferAttribute(starCols, 3));
+
+      const starMat = new THREE.PointsMaterial({
+        size: 5.5,
+        vertexColors: true,
+        map: photonTexture,
+        transparent: true,
+        opacity: 0.72,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const starField = new THREE.Points(starGeo, starMat);
+      scene.add(starField);
+
+      // 2. Drifting Neural Comets / Data Nodes
+      const cometCount = 50;
+      const cometGeo = new THREE.BufferGeometry();
+      const cometPos = new Float32Array(cometCount * 3);
+      const cometVels = [];
+
+      for (let i = 0; i < cometCount; i++) {
+        const i3 = i * 3;
+        cometPos[i3] = (Math.random() - 0.5) * 1600;
+        cometPos[i3 + 1] = (Math.random() - 0.5) * 1200;
+        cometPos[i3 + 2] = (Math.random() - 0.5) * 1400;
+
+        cometVels.push({
+          x: (Math.random() - 0.5) * 0.5 + 0.25,
+          y: (Math.random() - 0.5) * 0.3,
+          z: (Math.random() - 0.5) * 0.4
+        });
+      }
+
+      cometGeo.setAttribute('position', new THREE.BufferAttribute(cometPos, 3));
+
+      const cometMat = new THREE.PointsMaterial({
+        size: 9,
+        color: 0x38bdf8,
+        map: photonTexture,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const comets = new THREE.Points(cometGeo, cometMat);
+      scene.add(comets);
+
+      // Mouse Parallax & Scroll Reactivity
+      let mouseX = 0, mouseY = 0;
+      let targetX = 0, targetY = 0;
+      let scrollRatio = 0;
+
+      window.addEventListener('mousemove', (e) => {
+        targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+        targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+      }, { passive: true });
+
+      const pipeEl = document.getElementById('pipe-container');
+      if (pipeEl) {
+        pipeEl.addEventListener('scroll', () => {
+          scrollRatio = pipeEl.scrollLeft / (pipeEl.scrollWidth - pipeEl.clientWidth || 1);
+        }, { passive: true });
+      }
+
+      window.addEventListener('scroll', () => {
+        scrollRatio = window.scrollY / (document.body.scrollHeight - window.innerHeight || 1);
+      }, { passive: true });
+
+      // Resize Handler
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      }, { passive: true });
+
+      // Render Loop
+      const clock = new THREE.Clock();
+      function render() {
+        requestAnimationFrame(render);
+
+        const time = clock.getElapsedTime();
+
+        // Parallax Lerp
+        mouseX += (targetX - mouseX) * 0.035;
+        mouseY += (targetY - mouseY) * 0.035;
+
+        camera.position.x = mouseX * 60 + (scrollRatio - 0.5) * 120;
+        camera.position.y = -mouseY * 45;
+        camera.lookAt(0, 0, 0);
+
+        starField.rotation.y = time * 0.012 + scrollRatio * 0.25;
+        starField.rotation.x = time * 0.006;
+
+        // Animate Comets
+        const pAttr = cometGeo.attributes.position;
+        for (let i = 0; i < cometCount; i++) {
+          let x = pAttr.getX(i) + cometVels[i].x;
+          let y = pAttr.getY(i) + cometVels[i].y;
+          let z = pAttr.getZ(i) + cometVels[i].z;
+
+          if (x > 850) x = -850;
+          if (x < -850) x = 850;
+          if (y > 650) y = -650;
+          if (y < -650) y = 650;
+          if (z > 700) z = -700;
+          if (z < -700) z = 700;
+
+          pAttr.setXYZ(i, x, y, z);
+        }
+        pAttr.needsUpdate = true;
+
+        renderer.render(scene, camera);
+      }
+      render();
+    })();
+
+    // GSAP Modal Observer (Fluid Stagger Animations)
+    (function initGSAPModalObserver() {
+      const modalEl = document.getElementById('modal');
+      if (!modalEl || !window.MutationObserver) return;
+
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'class' && modalEl.classList.contains('active')) {
+            if (window.gsap) {
+              gsap.fromTo('.modal-content', 
+                { y: 24, scale: 0.97, opacity: 0 }, 
+                { y: 0, scale: 1, opacity: 1, duration: 0.42, ease: 'power3.out' }
+              );
+              
+              const headCards = modalEl.querySelectorAll('.head-card');
+              if (headCards.length > 0) {
+                gsap.fromTo(headCards,
+                  { y: 14, opacity: 0, scale: 0.95 },
+                  { y: 0, opacity: 1, scale: 1, duration: 0.35, stagger: 0.02, ease: 'power2.out', delay: 0.04 }
+                );
+              }
+
+              const moeRows = modalEl.querySelectorAll('.moe-row');
+              if (moeRows.length > 0) {
+                gsap.fromTo(moeRows,
+                  { x: 12, opacity: 0 },
+                  { x: 0, opacity: 1, duration: 0.32, stagger: 0.03, ease: 'power2.out', delay: 0.08 }
+                );
+              }
+
+              const dataRows = modalEl.querySelectorAll('.data-row');
+              if (dataRows.length > 0) {
+                gsap.fromTo(dataRows,
+                  { y: 10, opacity: 0 },
+                  { y: 0, opacity: 1, duration: 0.28, stagger: 0.02, ease: 'power2.out', delay: 0.04 }
+                );
+              }
+            }
+          }
+        });
+      });
+      observer.observe(modalEl, { attributes: true });
+    })();
+  </script>
+
+  <!-- STRICT PRESERVED LOGIC: DATA BINDING & STATE MACHINE -->
+  <script>
+    // --- LIVE JSON DATA INTEGRATION ---
+    let telemetryData = null;
+    let tokens = [];
+    let inputIds = [];
+    let generatedCount = 0; // Represents Pass 0 or Pass 1
+
+    const numLayers = 16;
+    let step = 0; 
+
+    // Fetch JSON on load
+    async function loadData() {
+      try {
+        const res = await fetch('telemetry.json');
+        if (!res.ok) throw new Error("Could not find telemetry.json");
+        const json = await res.json();
+        telemetryData = json.passes;
+        hardResetPipeline();
+      } catch (err) {
+        console.error(err);
+        document.getElementById('display-prompt').innerText = "Error: Cannot load telemetry.json. Must use a local web server.";
+      }
+    }
+    
+    // --- DOM Elements ---
+    const btnNext = document.getElementById('btnNext');
+    const btnGenerate = document.getElementById('btnGenerate');
+    const displayPrompt = document.getElementById('display-prompt');
+    const pipeContainer = document.getElementById('pipe-container');
+    
+    const machTok = document.getElementById('mach-tokenizer'); const machEmb = document.getElementById('mach-embedding');
+    const machLay = document.getElementById('mach-layers'); const machLm = document.getElementById('mach-lmhead');
+    const machOut = document.getElementById('mach-output');
+    
+    const tokEl = document.getElementById('tok-token'); const tokWord = document.getElementById('tok-word'); const tokId = document.getElementById('tok-id');
+    const embEl = document.getElementById('emb-token'); const embWord = document.getElementById('emb-word'); const embVec = document.getElementById('emb-vec');
+    
+    const conn1 = document.getElementById('conn-1'); const conn2 = document.getElementById('conn-2');
+    const conn3 = document.getElementById('conn-3'); const conn4 = document.getElementById('conn-4');
+    
+    const layersTrack = document.getElementById('layers-track'); const lmProbs = document.getElementById('lm-probs');
+    const outContainer = document.getElementById('out-container');
+    const modal = document.getElementById('modal'); const modalTitle = document.getElementById('modal-title'); const modalBody = document.getElementById('modal-body');
+
+    // --- Init ---
+    function initLayers() {
+      layersTrack.innerHTML = '';
+      for (let i = 0; i < numLayers; i++) {
+        const wrapper = document.createElement('div'); wrapper.className = 'layer-wrapper';
+        const node = document.createElement('div'); node.className = 'layer-node'; node.id = `layer-${i}`;
+        node.innerHTML = `<div class="l-title">Layer ${i}</div><div class="l-sub">Attn + MoE</div>`;
+        node.onclick = () => { if (node.classList.contains('processed')) showLayerSummary(i); };
+        wrapper.appendChild(node);
+        if (i < numLayers - 1) {
+          const lConn = document.createElement('div'); lConn.className = 'layer-conn'; lConn.id = `lconn-${i}`;
+          lConn.innerHTML = '<div class="l-signal"></div>'; wrapper.appendChild(lConn);
+        }
+        layersTrack.appendChild(wrapper);
+      }
+    }
+
+    function updatePromptDisplay() {
+      if(!telemetryData) return;
+      displayPrompt.innerHTML = `"${tokens.join("").replace(/Ġ/g, " ")}"`; 
+    }
+
+    // --- Core Logic ---
+    function triggerNext() {
+      if (step === 0) runTokenizer();
+      else if (step === 2) runEmbedding();
+      else if (step === 4) runLayersSequence();
+      else if (step === 6) runLMHead();
+    }
+
+    function resetPipeline() {
+      step = 0;
+      btnNext.style.display = 'block'; btnNext.innerText = "Start Pipeline"; btnNext.disabled = false;
+      btnGenerate.style.display = 'none';
+      [machTok, machEmb, machLay, machLm, machOut].forEach(m => m.classList.remove('active', 'done'));
+      [conn1, conn2, conn3, conn4].forEach(c => c.classList.remove('active'));
+      tokEl.className = 'flying-token'; embEl.className = 'flying-token';
+      lmProbs.classList.remove('visible'); outContainer.classList.remove('visible');
+      initLayers(); 
+      pipeContainer.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+
+    function hardResetPipeline() {
+      if(!telemetryData) return;
+      generatedCount = 0;
+      tokens = [...telemetryData[generatedCount].context_tokens];
+      inputIds = [...telemetryData[generatedCount].context_ids];
+      updatePromptDisplay();
+      resetPipeline();
+    }
+
+    function generateNextWord() {
+      if (!telemetryData || generatedCount >= telemetryData.length - 1) {
+        hardResetPipeline();
+        return;
+      }
+      generatedCount++;
+      tokens = [...telemetryData[generatedCount].context_tokens];
+      inputIds = [...telemetryData[generatedCount].context_ids];
+      
+      updatePromptDisplay();
+      resetPipeline();
+    }
+
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function processWord(el, wEl, dEl, word, dataTxt) {
+      wEl.innerText = word; dEl.innerText = dataTxt;
+      el.classList.remove('fly-out'); el.classList.add('fly-in');
+      await wait(400); 
+      el.classList.add('glow');
+      await wait(800); 
+      el.classList.remove('glow', 'fly-in'); el.classList.add('fly-out');
+      await wait(300);
+    }
+
+    // Grab vector string for UI (using tokenIndex to show different parts of the 2048D space)
+    const getRealVectorSlice = (passIndex, tokenIndex = 0) => {
+      if(!telemetryData) return "[ 0.000, 0.000 ... ]";
+      const emb = telemetryData[passIndex].embedding_2048D;
+      
+      // Shift the starting index based on the token so they look completely different visually
+      const start = (tokenIndex * 150) % 1500; 
+      const mid = start + 1024; // Grab a middle element
+      
+      return `[ ${emb[start].toFixed(4)}, ${emb[start+1].toFixed(4)}, ... ${emb[mid].toFixed(4)} ... ${emb[2047].toFixed(4)} ]`;
+    };
+
+    async function runTokenizer() {
+      step = 1; btnNext.disabled = true; btnNext.innerText = "Tokenizing...";
+      machTok.classList.add('active');
+      for (let i = 0; i < tokens.length; i++) {
+        const cleanWord = tokens[i].replace('Ġ', ' ');
+        await processWord(tokEl, tokWord, tokId, `"${cleanWord}"`, `ID: ${inputIds[i]}`);
+      }
+      machTok.classList.remove('active'); machTok.classList.add('done');
+      step = 2; btnNext.disabled = false; btnNext.innerText = "Run Embedding ➔";
+    }
+
+    async function runEmbedding() {
+      step = 3; btnNext.disabled = true; btnNext.innerText = "Projecting...";
+      conn1.classList.add('active'); await wait(800); conn1.classList.remove('active');
+      machEmb.classList.add('active');
+      pipeContainer.scrollTo({ left: 300, behavior: 'smooth' });
+      for (let i = 0; i < tokens.length; i++) {
+        // Pass the index 'i' so the UI samples a different slice of the vector for each word
+        await processWord(embEl, embWord, embVec, `ID: ${inputIds[i]}`, getRealVectorSlice(generatedCount, i));
+      }
+      machEmb.classList.remove('active'); machEmb.classList.add('done');
+      step = 4; btnNext.disabled = false; btnNext.innerText = "Propagate Layers ➔";
+    }
+
+    async function runLayersSequence() {
+      step = 5; btnNext.disabled = true; btnNext.innerText = "Processing Layers...";
+      conn2.classList.add('active'); await wait(800); conn2.classList.remove('active');
+      machLay.classList.add('active');
+      pipeContainer.scrollTo({ left: 700, behavior: 'smooth' });
+
+      for (let i = 0; i < numLayers; i++) {
+        const node = document.getElementById(`layer-${i}`);
+        node.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        node.classList.add('active'); await wait(250); 
+        node.classList.remove('active'); node.classList.add('processed');
+        if (i < numLayers - 1) {
+          const lConn = document.getElementById(`lconn-${i}`);
+          lConn.classList.add('active'); await wait(150); lConn.classList.remove('active');
+        }
+      }
+      machLay.classList.remove('active'); machLay.classList.add('done');
+      step = 6; btnNext.disabled = false; btnNext.innerText = "Run LM Head ➔";
+    }
+
+    async function runLMHead() {
+      step = 7; btnNext.disabled = true; btnNext.innerText = "Calculating Output...";
+      conn3.classList.add('active'); await wait(800); conn3.classList.remove('active');
+      machLm.classList.add('active');
+      pipeContainer.scrollTo({ left: 1200, behavior: 'smooth' });
+
+      const passData = telemetryData[generatedCount];
+      const lmData = passData.lm_head;
+      
+      let html = '';
+      lmData.forEach((p, i) => {
+        const cleanWord = p.token.replace('Ġ', ' ');
+        html += `<div class="prob-row ${i===0?'winner':''}"><span>${i+1}. "${cleanWord}" (ID:${p.id})</span><span>${(p.prob * 100).toFixed(1)}%</span></div>`;
+      });
+      html += `<div class="prob-dim">... 50,299 more tokens evaluated ...</div>`;
+      lmProbs.innerHTML = html;
+      
+      await wait(300); lmProbs.classList.add('visible'); await wait(1000);
+      machLm.classList.remove('active'); machLm.classList.add('done');
+
+      conn4.classList.add('active'); await wait(800); conn4.classList.remove('active');
+      machOut.classList.add('active');
+      pipeContainer.scrollTo({ left: 1600, behavior: 'smooth' });
+
+      const winnerTokenStr = passData.forced_next_token.replace('Ġ', ' ');
+      const winnerId = lmData[0].id; // We assume top predicted is forced token for visual simplicity
+
+      document.getElementById('final-word-text').innerText = `"${winnerTokenStr}"`;
+      document.getElementById('final-id-text').innerText = `Token ID: ${winnerId}`;
+      
+      const previewTokens = [...tokens.map(t => t.replace('Ġ', ' ')), winnerTokenStr];
+      document.getElementById('final-sentence-text').innerText = previewTokens.join("").replace(/ /g, " ");
+
+      await wait(300); outContainer.classList.add('visible');
+      machOut.classList.remove('active'); machOut.classList.add('done');
+
+      btnNext.style.display = 'none';
+      btnGenerate.style.display = 'block';
+
+      if (generatedCount >= telemetryData.length - 1) {
+        btnGenerate.innerText = "Restart Sequence ↺";
+        btnGenerate.style.background = "#ff4444";
+        btnGenerate.style.boxShadow = "0 0 15px rgba(255, 68, 68, 0.4)";
+      } else {
+        btnGenerate.innerText = "Generate Next Word ➔";
+        btnGenerate.style.background = "var(--glow-orange)";
+        btnGenerate.style.boxShadow = "0 0 15px rgba(255, 170, 0, 0.4)";
+      }
+    }
+
+    // --- Modals ---
+    function closeModal() { modal.classList.remove('active'); }
+    
+    function showTokenizerSummary() {
+      modalTitle.innerText = "Tokenizer Dictionary Mapping";
+      modalTitle.style.color = "var(--glow-cyan)";
+      let html = '';
+      tokens.forEach((t, i) => { 
+        html += `<div class="data-row"><div class="data-word">"${t.replace('Ġ', ' ')}"</div><div class="data-value" style="color:var(--glow-cyan)">ID: ${inputIds[i]}</div></div>`; 
+      });
+      modalBody.innerHTML = html; modal.classList.add('active');
+    }
+    
+    function showEmbeddingSummary() {
+      modalTitle.innerText = "W_E Tensor Matrix";
+      modalTitle.style.color = "var(--glow-cyan)";
+      let html = '';
+      tokens.forEach((t, i) => {
+        html += `<div class="data-row" style="flex-direction:column; align-items:flex-start;">
+            <div style="display:flex; justify-content:space-between; width:100%; margin-bottom: 8px;">
+              <div class="data-word">ID: ${inputIds[i]}</div><div style="font-size:0.7rem; color:#64748b">2048D Float32</div>
+            </div>
+            <div class="data-value" style="font-family:monospace;">${getRealVectorSlice(generatedCount, i)}</div>
+          </div>`;
+      });
+      modalBody.innerHTML = html; modal.classList.add('active');
+    }
+    
+    function showLayerSummary(layerIndex) {
+      const passData = telemetryData[generatedCount];
+      const seqLen = passData.context_tokens.length;
+      
+      modalTitle.innerText = `Layer ${layerIndex} Telemetry`;
+      modalTitle.style.color = "var(--glow-cyan)";
+
+      // Draw HTML structures safely replacing the old static modal
+      let html = `<div class="layer-modal-grid">`;
+      
+      // Left: Heatmaps
+      html += `<div><div class="lm-section-title">16 Multi-Head Attention Heatmaps</div><div class="heatmaps-grid">`;
+      
+      const layerAttn = passData.attention_matrices[layerIndex];
+      if(layerAttn && layerAttn.length === 16) {
+        layerAttn.forEach((headMatrix, hIdx) => {
+          html += `<div class="head-card"><div class="head-title">Head ${hIdx}</div>`;
+          html += `<div class="mini-heatmap" style="grid-template-columns: repeat(${seqLen}, 1fr);">`;
+          
+          for(let r=0; r<seqLen; r++) {
+            for(let c=0; c<seqLen; c++) {
+              const prob = headMatrix[r][c];
+              let bg = '#151a24';
+              if (prob > 0.05) bg = `rgba(56, 189, 248, ${prob})`; // scale cyan by probability
+              html += `<div class="hm-cell" style="background: ${bg};" title="${(prob*100).toFixed(1)}%"></div>`;
+            }
+          }
+          html += `</div></div>`;
+        });
+      } else {
+        html += `<div style="color:var(--text-dim); font-size:0.75rem; grid-column: span 4;">Attention data unavailable for this layer.</div>`;
+      }
+      html += `</div></div>`;
+
+      // Right: MoE Routing
+      html += `<div><div class="lm-section-title" style="color:#a855f7; border-color:rgba(168, 85, 247, 0.2);">MoE Top-8 Routing</div><div class="moe-list">`;
+      
+      const moeData = passData.moe_routing[layerIndex];
+      if (moeData) {
+        for(let i=0; i<8; i++) {
+          const eId = moeData.top8_indices[i];
+          const perc = (moeData.top8_probs[i] * 100).toFixed(1);
+          html += `
+            <div class="moe-row">
+              <div class="moe-id">E-${eId}</div>
+              <div class="moe-bar-wrap"><div class="moe-bar-fill" style="width: ${perc}%;"></div></div>
+              <div class="moe-val">${perc}%</div>
+            </div>
+          `;
+        }
+      } else {
+        html += `<div style="color:var(--text-dim); font-size:0.75rem;">MoE data unavailable.</div>`;
+      }
+      html += `</div></div></div>`; // End MoE and Grid
+      
+      modalBody.innerHTML = html;
+      modal.classList.add('active');
+    }
+
+    // Trigger on load
+    window.onload = loadData;
+  </script>
+</body>
+</html>
