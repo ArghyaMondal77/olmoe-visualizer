@@ -2,191 +2,532 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Micro-Math // Attention Core, Masking & Projection</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-void: #050507;
+      --bg-surface: #0a0c10;
+      --bg-elevated: #11141c;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-medium: rgba(255, 255, 255, 0.15);
       --core-green: #10b981;
       --attn-cyan: #0ea5e9;
       --moe-purple: #8b5cf6;
       --val-orange: #f59e0b;
       --alert-red: #f43f5e;
       --text-main: #f8fafc;
+      --text-muted: #94a3b8;
       --text-dim: #475569;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', sans-serif; background-color: var(--bg-void); color: var(--text-main);
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-void);
+      color: var(--text-main);
       overflow-x: hidden;
       background-image: 
-        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
-        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
-      background-size: 100% 100%, 40px 40px, 40px 40px;
-      display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding-bottom: 60px;
+        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.06) 0%, transparent 60%),
+        linear-gradient(to right, rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 100% 100%, 32px 32px, 32px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding-bottom: 60px;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* TOP BAR */
     .top-bar {
-      width: 100%; height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.8);
-      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between;
-      align-items: center; backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 200;
+      width: 100%;
+      height: clamp(56px, 7vw, 70px);
+      padding: 0 clamp(16px, 4vw, 40px);
+      background: rgba(5, 5, 7, 0.85);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 200;
     }
-    .btn-back {
-      background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 8px 18px;
-      font-size: 0.7rem; cursor: pointer; border-radius: 4px; text-transform: uppercase;
-      letter-spacing: 2px; transition: all 0.3s; font-family: 'JetBrains Mono', monospace; font-weight: 700;
-    }
-    .btn-back:hover { color: #fff; border-color: var(--attn-cyan); box-shadow: 0 0 15px rgba(14, 165, 233, 0.2); }
 
-    .content-wrapper { width: 100%; max-width: 1100px; padding: 40px 20px; display: flex; flex-direction: column; gap: 30px; }
+    .btn-back {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      border: 1px solid var(--border-medium);
+      padding: 8px clamp(12px, 2vw, 18px);
+      font-size: 0.68rem;
+      cursor: pointer;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      transition: all 0.25s ease;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .btn-back:hover {
+      color: #fff;
+      border-color: var(--attn-cyan);
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.25);
+    }
+
+    .top-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.6rem, 1.8vw, 0.75rem);
+      letter-spacing: clamp(1px, 0.4vw, 3px);
+      color: var(--text-dim);
+      font-weight: 400;
+      text-align: right;
+    }
+    .top-badge span { color: #fff; font-weight: 600; }
+
+    /* LAYOUT WRAPPER */
+    .content-wrapper {
+      width: 100%;
+      max-width: 1100px;
+      padding: clamp(20px, 4vw, 40px) clamp(14px, 3vw, 24px);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(20px, 3.5vw, 32px);
+    }
 
     /* HEADER & FORMULA */
-    .math-header { text-align: center; margin-bottom: 10px; }
-    .math-title { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; color: var(--attn-cyan); letter-spacing: 2px; margin-bottom: 15px; }
+    .math-header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .math-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.25rem, 3.2vw, 1.75rem);
+      color: var(--attn-cyan);
+      letter-spacing: 0.5px;
+      font-weight: 700;
+    }
     
     .formula-box {
-      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);
-      padding: 20px 40px; border-radius: 8px; display: inline-flex; flex-direction: column; gap: 10px;
-      font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; color: #cbd5e1;
-      box-shadow: inset 0 0 20px rgba(0,0,0,0.5); letter-spacing: 1px;
+      background: rgba(10, 14, 22, 0.85);
+      border: 1px solid var(--border-subtle);
+      padding: clamp(14px, 3vw, 22px) clamp(16px, 4vw, 36px);
+      border-radius: 8px;
+      display: inline-flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.85rem, 2.3vw, 1.25rem);
+      color: #cbd5e1;
+      box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.6);
+      width: 100%;
+      max-width: 880px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      text-align: left;
     }
-    .fm-part { transition: all 0.3s; padding: 2px 6px; border-radius: 4px; }
-    .fm-hl { background: rgba(255,255,255,0.1); color: #fff; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
-    .fm-q { color: var(--attn-cyan); } .fm-k { color: var(--moe-purple); } .fm-v { color: var(--val-orange); }
+    .fm-part {
+      transition: all 0.3s ease;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .fm-hl {
+      background: rgba(14, 165, 233, 0.18);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+      border: 1px solid rgba(14, 165, 233, 0.4);
+    }
+    .fm-q { color: var(--attn-cyan); }
+    .fm-k { color: var(--moe-purple); }
+    .fm-v { color: var(--val-orange); }
     .fm-mask { color: var(--alert-red); font-weight: bold; }
     .fm-wo { color: var(--core-green); font-weight: bold; }
 
     /* ANIMATION STAGE */
     .stage {
-      background: linear-gradient(180deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.9) 100%);
-      border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 40px; min-height: 550px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, rgba(14, 18, 26, 0.75) 0%, rgba(7, 9, 14, 0.95) 100%);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: clamp(20px, 4vw, 40px);
+      min-height: 480px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       position: relative;
+      width: 100%;
+      overflow: hidden;
     }
 
     /* ========================================= */
     /* PHASE 1: THE HEATMAP GRID                 */
     /* ========================================= */
     .heatmap-wrapper {
-      display: flex; flex-direction: column; align-items: center; width: 100%;
-      transition: opacity 0.5s; opacity: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 100%;
+      transition: opacity 0.5s ease;
+      opacity: 1;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 4px 2px 14px;
     }
-    .heatmap-wrapper.hidden { opacity: 0; pointer-events: none; position: absolute; }
+    .heatmap-wrapper.hidden {
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+    }
 
     .heatmap-container {
-      display: grid; grid-template-columns: 80px repeat(5, 90px);
-      grid-template-rows: 40px repeat(5, 60px); gap: 4px; margin-bottom: 30px;
+      display: grid;
+      grid-template-columns: minmax(52px, 80px) repeat(5, minmax(48px, 90px));
+      grid-template-rows: 38px repeat(5, minmax(44px, 58px));
+      gap: 4px;
+      margin-bottom: 24px;
       position: relative;
+      min-width: 295px;
     }
 
     .cell {
-      display: flex; justify-content: center; align-items: center;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700;
-      border-radius: 4px; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+      font-weight: 700;
+      border-radius: 4px;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
     }
     
-    .header-k { background: rgba(139, 92, 246, 0.1); color: var(--moe-purple); border: 1px solid rgba(139, 92, 246, 0.3); font-size: 0.75rem; }
-    .header-q { background: rgba(14, 165, 233, 0.1); color: var(--attn-cyan); border: 1px solid rgba(14, 165, 233, 0.3); font-size: 0.75rem; }
+    .header-k {
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--moe-purple);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      font-size: clamp(0.62rem, 1.5vw, 0.75rem);
+    }
+    .header-q {
+      background: rgba(14, 165, 233, 0.1);
+      color: var(--attn-cyan);
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      font-size: clamp(0.62rem, 1.5vw, 0.75rem);
+    }
     .corner { background: transparent; }
 
-    .data-cell { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); color: #94a3b8; position: relative; overflow: hidden; }
-    .data-cell.masked { background: rgba(15, 15, 20, 0.8); border: 1px dashed rgba(244, 63, 94, 0.3); color: var(--alert-red); box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
+    .data-cell {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      position: relative;
+      overflow: hidden;
+    }
+    .data-cell.masked {
+      background: rgba(18, 12, 16, 0.8);
+      border: 1px dashed rgba(244, 63, 94, 0.35);
+      color: var(--alert-red);
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+    }
     
-    .heat-fill { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: var(--core-green); opacity: 0; transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); z-index: 1; }
-    .data-val { position: relative; z-index: 2; transition: color 0.3s; }
+    .heat-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0%;
+      background: var(--core-green);
+      opacity: 0;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1;
+    }
+    .data-val {
+      position: relative;
+      z-index: 2;
+      transition: color 0.3s;
+      white-space: nowrap;
+    }
 
     /* ========================================= */
     /* PHASE 2: CONCATENATION & W_O PROJECTION   */
     /* ========================================= */
     .projection-wrapper {
-      display: flex; flex-direction: column; align-items: center; width: 100%;
-      opacity: 0; pointer-events: none; position: absolute; transition: opacity 0.5s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      transition: opacity 0.5s ease;
+      padding: 10px 0;
     }
-    .projection-wrapper.active { opacity: 1; pointer-events: auto; position: relative; }
+    .projection-wrapper.active {
+      opacity: 1;
+      pointer-events: auto;
+      position: relative;
+    }
 
-    .heads-row { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; transition: gap 1.5s cubic-bezier(0.25, 1, 0.5, 1); width: 100%; }
+    .heads-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      transition: gap 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+      width: 100%;
+      max-width: 650px;
+      flex-wrap: wrap;
+    }
     .heads-row.merged { gap: 0; }
     
     .head-block {
-      background: rgba(14, 165, 233, 0.15); border: 1px solid var(--attn-cyan); padding: 15px 0;
-      border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #fff;
-      text-align: center; transition: all 1.5s cubic-bezier(0.25, 1, 0.5, 1); flex: 1; max-width: 120px;
+      background: rgba(14, 165, 233, 0.12);
+      border: 1px solid var(--attn-cyan);
+      padding: clamp(10px, 2vw, 15px) 8px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.68rem, 1.8vw, 0.8rem);
+      color: #fff;
+      text-align: center;
+      transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+      flex: 1;
+      min-width: 65px;
+      max-width: 120px;
     }
-    .heads-row.merged .head-block { border-radius: 0; border-right: none; background: rgba(14, 165, 233, 0.25); box-shadow: 0 0 15px rgba(14, 165, 233, 0.4); border-top: 1px solid var(--attn-cyan); border-bottom: 1px solid var(--attn-cyan); }
-    .heads-row.merged .head-block:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; border-left: 1px solid var(--attn-cyan); }
-    .heads-row.merged .head-block:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; border-right: 1px solid var(--attn-cyan); }
+    .heads-row.merged .head-block {
+      border-radius: 0;
+      border-right: none;
+      background: rgba(14, 165, 233, 0.22);
+      box-shadow: 0 0 15px rgba(14, 165, 233, 0.35);
+      border-top: 1px solid var(--attn-cyan);
+      border-bottom: 1px solid var(--attn-cyan);
+    }
+    .heads-row.merged .head-block:first-child {
+      border-top-left-radius: 6px;
+      border-bottom-left-radius: 6px;
+      border-left: 1px solid var(--attn-cyan);
+    }
+    .heads-row.merged .head-block:last-child {
+      border-top-right-radius: 6px;
+      border-bottom-right-radius: 6px;
+      border-right: 1px solid var(--attn-cyan);
+    }
 
-    .math-operator { font-family: 'JetBrains Mono', monospace; font-size: 2rem; color: #64748b; margin: 15px 0; opacity: 0; transform: translateY(-10px); transition: all 0.5s 0.8s; }
-    .math-operator.active { opacity: 1; transform: translateY(0); color: var(--core-green); text-shadow: 0 0 15px var(--core-green); }
+    .math-operator {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(1.5rem, 3.5vw, 2rem);
+      color: var(--text-dim);
+      margin: 12px 0;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: all 0.5s 0.7s;
+    }
+    .math-operator.active {
+      opacity: 1;
+      transform: translateY(0);
+      color: var(--core-green);
+      text-shadow: 0 0 15px var(--core-green);
+    }
 
     .wo-matrix {
-      background: rgba(16, 185, 129, 0.05); border: 2px solid rgba(16, 185, 129, 0.4); padding: 20px 40px;
-      border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #fff;
-      text-align: center; box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
-      opacity: 0; transform: translateY(-20px); transition: all 0.6s 1s; width: 60%;
+      background: rgba(16, 185, 129, 0.05);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: clamp(14px, 3vw, 20px) clamp(16px, 4vw, 40px);
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.85rem, 2.5vw, 1.15rem);
+      color: #fff;
+      text-align: center;
+      box-shadow: inset 0 0 25px rgba(0,0,0,0.8);
+      opacity: 0;
+      transform: translateY(-16px);
+      transition: all 0.6s 0.9s;
+      width: 100%;
+      max-width: 520px;
     }
-    .wo-matrix.active { opacity: 1; transform: translateY(0); box-shadow: inset 0 0 30px rgba(16, 185, 129, 0.2), 0 0 30px rgba(16, 185, 129, 0.15); }
+    .wo-matrix.active {
+      opacity: 1;
+      transform: translateY(0);
+      box-shadow: inset 0 0 30px rgba(16, 185, 129, 0.15), 0 0 25px rgba(16, 185, 129, 0.12);
+    }
     
     .final-out {
-      background: rgba(255, 255, 255, 0.05); border: 1px solid #fff; padding: 15px 40px;
-      border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #fff;
-      opacity: 0; transform: translateY(-20px); transition: all 0.6s 1.8s; font-weight: bold; letter-spacing: 1px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      padding: clamp(12px, 2.5vw, 16px) clamp(16px, 4vw, 40px);
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.85rem, 2.5vw, 1.15rem);
+      color: #fff;
+      opacity: 0;
+      transform: translateY(-16px);
+      transition: all 0.6s 1.6s;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      width: 100%;
+      max-width: 520px;
+      text-align: center;
     }
-    .final-out.active { opacity: 1; transform: translateY(0); background: #fff; color: #000; box-shadow: 0 0 40px rgba(255,255,255,0.6); }
+    .final-out.active {
+      opacity: 1;
+      transform: translateY(0);
+      background: #f8fafc;
+      color: #050507;
+      box-shadow: 0 0 35px rgba(255, 255, 255, 0.4);
+    }
 
-    .shape-lbl { font-size: 0.75rem; color: var(--text-dim); margin-top: 5px; font-weight: normal; letter-spacing: 0; }
+    .shape-lbl {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-top: 5px;
+      font-weight: normal;
+      letter-spacing: 0;
+    }
 
     /* CONTROLS */
-    .controls { display: flex; gap: 15px; margin-top: 20px; align-items: center; justify-content: center; width: 100%; }
-    .btn-step {
-      background: var(--attn-cyan); color: #000; border: none; padding: 12px 24px; border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.85rem; cursor: pointer;
-      text-transform: uppercase; transition: all 0.3s; box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    .controls {
+      display: flex;
+      gap: 16px;
+      margin-top: 24px;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 800px;
+      flex-wrap: wrap;
     }
-    .btn-step:hover { box-shadow: 0 0 30px rgba(14, 165, 233, 0.6); transform: translateY(-2px); }
-    .status-text { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #94a3b8; width: 550px; text-align: left; line-height: 1.6; }
+
+    .btn-step {
+      background: var(--attn-cyan);
+      color: #050507;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: clamp(0.75rem, 2vw, 0.85rem);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.25);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-step:hover {
+      box-shadow: 0 0 30px rgba(14, 165, 233, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .status-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.78rem, 2vw, 0.85rem);
+      color: var(--text-muted);
+      flex: 1;
+      min-width: 260px;
+      max-width: 550px;
+      text-align: left;
+      line-height: 1.6;
+    }
 
     /* EDITORIAL SECTION */
-    .editorial-section { width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px; }
-    .ed-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; }
-    @media (max-width: 900px) { .ed-grid { grid-template-columns: 1fr; } }
-    .ed-col h3 { font-family: 'JetBrains Mono', monospace; font-size: 1rem; color: #fff; margin-bottom: 15px; letter-spacing: 1px; border-bottom: 1px solid #334; padding-bottom: 8px;}
-    .ed-col p { font-size: 0.85rem; color: #94a3b8; line-height: 1.8; font-weight: 300; margin-bottom: 15px; }
+    .editorial-section {
+      width: 100%;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 36px;
+    }
+    .ed-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: clamp(20px, 3.5vw, 40px);
+    }
+    .ed-col h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(0.9rem, 2vw, 1rem);
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 8px;
+      font-weight: 700;
+    }
+    .ed-col p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.8;
+      font-weight: 400;
+      margin-bottom: 14px;
+    }
     .ed-col span.hl { color: #fff; font-weight: 600; }
 
+    /* RESPONSIVE MEDIA QUERIES */
+    @media (max-width: 768px) {
+      .ed-grid { grid-template-columns: 1fr; }
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .btn-step {
+        width: 100%;
+        text-align: center;
+      }
+      .status-text {
+        text-align: center;
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .top-bar { padding: 0 12px; }
+      .heatmap-container {
+        grid-template-columns: 46px repeat(5, 52px);
+        grid-template-rows: 34px repeat(5, 46px);
+        gap: 3px;
+      }
+      .head-block {
+        min-width: 54px;
+        padding: 8px 4px;
+        font-size: 0.65rem;
+      }
+    }
   </style>
 </head>
 <body>
 
   <div class="top-bar">
     <button class="btn-back" onclick="window.close()">← Macro Topology</button>
-    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
-      MICRO-MATH <span style="color:#fff; font-weight:600;">//</span> CAUSAL ATTENTION & W_O
+    <div class="top-badge">
+      MICRO-MATH <span>//</span> CAUSAL ATTENTION &amp; W_O
     </div>
   </div>
 
   <div class="content-wrapper">
     
     <div class="math-header">
-      <div class="math-title">MHA: Scaled Dot-Product & Final Projection</div>
+      <div class="math-title">MHA: Scaled Dot-Product &amp; Final Projection</div>
       <div class="formula-box">
-        <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Phase 1: Head Computation (Repeated 16x)</div>
+        <div style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 1px;">Phase 1: Head Computation (Repeated 16x)</div>
         <div>head<sub>i</sub> = 
           <span class="fm-part" id="fm-soft">softmax(</span> 
           <span class="fm-part" id="fm-qk">
             (<span class="fm-q">Q<sub>i</sub></span>·<span class="fm-k">K<sub>i</sub></span><sup>T</sup>) 
-            <span class="fm-part" id="fm-scale">/ √<span style="font-size: 1rem;">d<sub>k</sub></span></span> 
+            <span class="fm-part" id="fm-scale">/ √<span style="font-size: 0.9em;">d<sub>k</sub></span></span> 
             <span class="fm-part" id="fm-mask"><span class="fm-mask">+ M</span></span>
           </span> 
           <span class="fm-part" id="fm-soft-end">)</span> 
           <span class="fm-part" id="fm-v"><span class="fm-v">V<sub>i</sub></span></span>
         </div>
-        <div style="font-size: 0.8rem; color: #64748b; text-transform: uppercase; margin: 15px 0 5px 0;">Phase 2: Head Concatenation & Output</div>
+        <div style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; margin: 12px 0 4px 0; letter-spacing: 1px;">Phase 2: Head Concatenation &amp; Output</div>
         <div>MHA_Out = <span class="fm-part" id="fm-concat">Concat(head<sub>0</sub> ... head<sub>15</sub>)</span> · <span class="fm-part" id="fm-wo"><span class="fm-wo">W<sub>O</sub></span></span></div>
       </div>
     </div>
@@ -204,7 +545,7 @@
       <!-- PHASE 2: CONCAT & W_O -->
       <div class="projection-wrapper" id="projWrapper">
         
-        <div style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px; text-transform: uppercase;">1. Concatenate 16 Independent Heads</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">1. Concatenate 16 Independent Heads</div>
         
         <div class="heads-row" id="headsRow">
           <!-- Symbolically showing a few heads to represent the 16 -->
@@ -215,7 +556,7 @@
           <div class="head-block">Head 15<div class="shape-lbl">Dim: 128</div></div>
         </div>
         
-        <div style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--attn-cyan); margin-top: 5px; opacity: 0; transition: opacity 0.5s 1s;" id="concatShapeLbl">Resulting Shape: [1, 2048]</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--attn-cyan); margin-top: 6px; opacity: 0; transition: opacity 0.5s 1s;" id="concatShapeLbl">Resulting Shape: [1, 2048]</div>
 
         <div class="math-operator" id="opMul">×</div>
 
@@ -245,24 +586,24 @@
     <!-- EDITORIAL -->
     <div class="editorial-section">
       <div class="ed-grid">
-        <div>
-          <h3 style="color: var(--attn-cyan);">THE NUMERATOR Q . K^T & TEMPERATURE</h3>
+        <div class="ed-col">
+          <h3 style="color: var(--attn-cyan);">THE NUMERATOR Q · K^T &amp; TEMPERATURE</h3>
           <p>Every word (Query) asks every other word (Key): <i>"How relevant are you to me?"</i> Because OLMoE operates in 128 dimensions per head, the dot product produces massively large numbers.</p>
           <p>We divide by √128 (approx 11.3). This <span class="hl">Temperature Scaling</span> squashes the variance down to a stable range to prevent the Softmax from peaking at 99.99% and killing gradients.</p>
         </div>
-        <div>
-          <h3 style="color: var(--alert-red);">THE CAUSAL MASK ( M)</h3>
+        <div class="ed-col">
+          <h3 style="color: var(--alert-red);">THE CAUSAL MASK (M)</h3>
           <p>Decoder-only models generate text autoregressively. During parallel training, a word <span class="hl">cannot be allowed to look at words that come after it</span>.</p>
           <p>We enforce this by adding -∞ to the upper triangle of the matrix. The Softmax translates e^-∞ to exactly 0.000%, guaranteeing future words are completely ignored.</p>
         </div>
-        <div>
+        <div class="ed-col">
           <h3 style="color: var(--val-orange);">THE VALUE EXTRACTION (V)</h3>
           <p>The resulting probabilities are multiplied by the <span class="hl">Value V</span> matrix. If "capital" pays 85% of its attention to "France", it absorbs 85% of the semantic meaning from the "France" Value vector.</p>
           <p>This process happens simultaneously across all 16 heads. Each head extracts a different 128-dimensional perspective (e.g., Head 0 extracts grammar, Head 1 extracts geography).</p>
         </div>
-        <div>
-          <h3 style="color: var(--core-green);">CONCATENATION & W_O PROJECTION</h3>
-          <p>After all 16 heads compute their 128-dimensional Value outputs, they are <span class="hl">concatenated</span> back together side-by-side 16 times 128 = 2048.</p>
+        <div class="ed-col">
+          <h3 style="color: var(--core-green);">CONCATENATION &amp; W_O PROJECTION</h3>
+          <p>After all 16 heads compute their 128-dimensional Value outputs, they are <span class="hl">concatenated</span> back together side-by-side: 16 × 128 = 2048.</p>
           <p>Finally, this rejoined 2048D vector is multiplied by the Output Projection Matrix W_O. This matrix mixes the insights from all 16 isolated heads back together, producing the final attention payload that will be added to the residual spine.</p>
         </div>
       </div>
@@ -346,7 +687,7 @@
             document.getElementById(`val-${r}-${c}`).innerText = scaledMatrix[r][c].toFixed(2);
           }
         }
-        statusText.innerHTML = "<b>Step 2: Temperature Scaling.</b> Divide by $\\sqrt{128}$ (approx 11.3). The variance is squashed down to a stable range, preserving gradients.";
+        statusText.innerHTML = "<b>Step 2: Temperature Scaling.</b> Divide by √128 (approx 11.3). The variance is squashed down to a stable range, preserving gradients.";
         btnNext.innerText = "Apply Mask (+M) ➔";
         step = 1;
       }
@@ -401,7 +742,7 @@
             }
           }
         }
-        statusText.innerHTML = "<b>Step 4: Softmax Probabilities.</b> The rows are exponentiated and normalized. $e^{-\\infty} = 0$, so future words get exactly 0.000%.";
+        statusText.innerHTML = "<b>Step 4: Softmax Probabilities.</b> The rows are exponentiated and normalized. e^-∞ = 0, so future words get exactly 0.000%.";
         btnNext.innerText = "Multiply by V ➔";
         step = 3;
       }
@@ -432,7 +773,7 @@
         step = 4;
       }
       else if (step === 4) {
-        // STEP 5: Concat & WO Projection (NEW)
+        // STEP 5: Concat & WO Projection
         fmV.classList.remove('fm-hl');
         fmConcat.classList.add('fm-hl');
         fmWo.classList.add('fm-hl');
@@ -457,11 +798,11 @@
           document.getElementById('finalOut').classList.add('active');
         }, 1500);
 
-        statusText.innerHTML = "<b>Step 6: Concatenation & W<sub>O</sub> Projection.</b> The 16 independent 128D heads are concatenated back into a 2048D vector. This is multiplied by the Output Projection Matrix ($W_O$) to mix the multi-head insights together.";
+        statusText.innerHTML = "<b>Step 6: Concatenation & W<sub>O</sub> Projection.</b> The 16 independent 128D heads are concatenated back into a 2048D vector. This is multiplied by the Output Projection Matrix (W<sub>O</sub>) to mix the multi-head insights together.";
         
         btnNext.innerText = "Reset Drill Down ↺";
         btnNext.style.background = 'transparent';
-        btnNext.style.border = '1px solid var(--text-dim)';
+        btnNext.style.border = '1px solid var(--border-medium)';
         btnNext.style.color = '#fff';
         btnNext.style.boxShadow = 'none';
         step = 5;
@@ -489,8 +830,8 @@
             const valEl = document.getElementById(`val-${r}-${c}`);
             const fillEl = document.getElementById(`fill-${r}-${c}`);
             valEl.innerText = rawMatrix[r][c].toFixed(1);
-            valEl.style.fontSize = '0.85rem';
-            valEl.style.color = '#94a3b8';
+            valEl.style.fontSize = '';
+            valEl.style.color = 'var(--text-muted)';
             fillEl.style.height = '0%';
             fillEl.style.opacity = '0';
           }
@@ -500,15 +841,14 @@
         btnNext.innerText = "Scale by √d ➔";
         btnNext.style.background = 'var(--attn-cyan)';
         btnNext.style.border = 'none';
-        btnNext.style.color = '#000';
-        btnNext.style.boxShadow = '0 0 20px rgba(14, 165, 233, 0.3)';
+        btnNext.style.color = '#050507';
+        btnNext.style.boxShadow = '0 0 20px rgba(14, 165, 233, 0.25)';
         step = 0;
       }
     }
 
     // Initial highlight
     fmQK.classList.add('fm-hl');
-
   </script>
 </body>
 </html>

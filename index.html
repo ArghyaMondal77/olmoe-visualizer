@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>OLMoE Execution Pipeline // Neural Network Visualizer</title>
   
   <!-- Premium Technical Typography -->
@@ -16,7 +16,7 @@
 
   <style>
     /* ==========================================================================
-       DESIGN PHILOSOPHY: ANTI-AI SLOP / DEEP SPACE & HARDWARE INSTRUMENTATION
+       1. DESIGN TOKENS & SYSTEM VARIABLES
        ========================================================================== */
     :root {
       /* Void & Chassis Surfaces */
@@ -25,12 +25,12 @@
       --bg-surface: #12151f;
       --bg-recessed: #08090d;
       
-      /* Precision Metallic & Instrumental Accents */
-      --border-subtle: rgba(255, 255, 255, 0.07);
-      --border-medium: rgba(255, 255, 255, 0.12);
-      --border-focus: rgba(56, 189, 248, 0.4);
+      /* Precision Metallic Borders */
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-medium: rgba(255, 255, 255, 0.14);
+      --border-focus: rgba(56, 189, 248, 0.45);
       
-      /* Telemetry Accents (Controlled, High-contrast, Never Over-blown) */
+      /* Telemetry Accents */
       --glow-cyan: #38bdf8;
       --glow-cyan-dim: rgba(56, 189, 248, 0.15);
       --glow-green: #10b981;
@@ -47,7 +47,7 @@
       --text-dark: #334155;
       
       /* Hardware Conduit & Buses */
-      --bus-line: rgba(255, 255, 255, 0.08);
+      --bus-line: rgba(255, 255, 255, 0.09);
       --bus-track: #090a0f;
     }
 
@@ -83,10 +83,10 @@
       height: 100vh;
       z-index: 0;
       pointer-events: none;
-      background: radial-gradient(circle at 50% 30%, #0d111a 0%, #06070a 100%);
+      background: radial-gradient(circle at 50% 25%, #0e121d 0%, #06070a 100%);
     }
 
-    /* Cinematic Vignette Overlay */
+    /* Vignette & Hairline Coordinate Grid */
     .bg-vignette {
       position: fixed;
       top: 0;
@@ -97,10 +97,9 @@
       pointer-events: none;
       background: 
         radial-gradient(circle at 50% 15%, transparent 40%, rgba(6, 7, 10, 0.85) 90%),
-        linear-gradient(180deg, rgba(6,7,10,0.2) 0%, rgba(6,7,10,0.6) 100%);
+        linear-gradient(180deg, rgba(6,7,10,0.15) 0%, rgba(6,7,10,0.65) 100%);
     }
 
-    /* Subtle Technical Grid Matrix */
     .bg-grid {
       position: fixed;
       top: 0;
@@ -109,40 +108,43 @@
       height: 100vh;
       z-index: 2;
       pointer-events: none;
-      background-size: 60px 60px;
+      background-size: 50px 50px;
       background-image: 
         linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-      mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
-      -webkit-mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
+      mask-image: radial-gradient(circle at 50% 50%, black 35%, transparent 85%);
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, black 35%, transparent 85%);
     }
 
     /* ==========================================================================
-       TOP CONTROL BAR & INSTRUMENTATION HUD
+       2. TOP BAR & INSTRUMENTATION HUD
        ========================================================================== */
     .top-bar {
       width: 100%;
-      padding: 18px 36px;
-      background: rgba(10, 12, 17, 0.82);
+      padding: 16px 28px;
+      padding-top: max(14px, env(safe-area-inset-top));
+      padding-left: max(20px, env(safe-area-inset-left));
+      padding-right: max(20px, env(safe-area-inset-right));
+      background: rgba(10, 12, 17, 0.88);
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
       position: sticky;
       top: 0;
       z-index: 100;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.7);
     }
 
     .top-bar-meta {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       font-size: 0.65rem;
-      letter-spacing: 0.15em;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--text-dim);
       font-family: 'Space Grotesk', sans-serif;
@@ -160,18 +162,20 @@
 
     .original-prompt {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       color: #fff;
       font-weight: 400;
       letter-spacing: 0.02em;
       text-align: center;
       max-width: 860px;
+      width: 100%;
       line-height: 1.4;
-      background: rgba(255, 255, 255, 0.02);
-      padding: 10px 22px;
+      background: rgba(255, 255, 255, 0.025);
+      padding: 10px 20px;
       border-radius: 8px;
       border: 1px solid var(--border-subtle);
       box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+      word-break: break-word;
     }
 
     .original-prompt span {
@@ -182,18 +186,19 @@
 
     .controls {
       display: flex;
-      gap: 14px;
+      gap: 12px;
       flex-wrap: wrap;
       justify-content: center;
       align-items: center;
+      width: 100%;
     }
 
     /* Precision Buttons */
     button {
-      padding: 10px 22px;
+      padding: 10px 20px;
       font-family: 'Space Grotesk', sans-serif;
       font-weight: 600;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       border-radius: 6px;
@@ -271,224 +276,23 @@
     }
 
     /* ==========================================================================
-       RESPONSIVE PIPELINE ARCHITECTURE (CORE RESPONSIVE FIX)
+       3. PIPELINE CONTAINER (CORE LAYOUT SYSTEM)
        ========================================================================== */
     .pipeline-container {
       flex: 1;
       display: flex;
       position: relative;
       z-index: 10;
-      transition: all 0.3s ease;
+      width: 100%;
+      scroll-behavior: smooth;
     }
 
-    /* --- DESKTOP / LAPTOP (Horizontal LTR Pipeline) --- */
-    @media (min-width: 1024px) {
-      .pipeline-container {
-        flex-direction: row;
-        justify-content: flex-start;
-        align-items: center;
-        padding: 60px 48px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        min-height: calc(100vh - 135px);
-      }
-
-      .pipeline-container::-webkit-scrollbar {
-        height: 7px;
-      }
-      .pipeline-container::-webkit-scrollbar-track {
-        background: rgba(10, 12, 17, 0.8);
-      }
-      .pipeline-container::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.15);
-        border-radius: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-      .pipeline-container::-webkit-scrollbar-thumb:hover {
-        background: var(--glow-cyan);
-      }
-
-      /* Horizontal Connectors */
-      .connector-main {
-        width: 54px;
-        height: 4px;
-        margin: 0;
-      }
-      .connector-main .signal {
-        height: 100%;
-        width: 28px;
-        left: -30px;
-        top: 0;
-        animation: signalX 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-      }
-
-      .layers-machine {
-        width: 520px;
-        height: 275px;
-      }
-
-      .scroller-window {
-        flex-direction: row;
-        overflow-x: auto;
-        overflow-y: hidden;
-        align-items: center;
-      }
-
-      .layer-wrapper {
-        flex-direction: row;
-      }
-
-      .layer-conn {
-        width: 26px;
-        height: 3px;
-      }
-      .layer-conn .l-signal {
-        height: 100%;
-        width: 50%;
-        left: -50%;
-        top: 0;
-        animation: signalX 0.6s linear infinite;
-      }
-    }
-
-    /* --- MOBILE / TABLET (Snaps into Vertical Timeline) --- */
-    @media (max-width: 1023px) {
-      .top-bar {
-        padding: 16px 20px;
-        gap: 12px;
-      }
-      .original-prompt {
-        font-size: 0.95rem;
-        padding: 8px 16px;
-      }
-      button {
-        padding: 9px 18px;
-        font-size: 0.75rem;
-      }
-
-      .pipeline-container {
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-start;
-        padding: 36px 16px 80px;
-        width: 100%;
-        max-width: 440px;
-        margin: 0 auto;
-        overflow-x: hidden;
-      }
-
-      .machine {
-        width: 100% !important;
-        max-width: 380px;
-      }
-
-      /* Vertical Downward Connectors (Rotated 90 degrees) */
-      .connector-main {
-        width: 4px !important;
-        height: 44px !important;
-        margin: 0 auto;
-      }
-      .connector-main .signal {
-        width: 100% !important;
-        height: 24px !important;
-        top: -26px !important;
-        left: 0 !important;
-        animation: signalY 1s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
-      }
-
-      .layers-machine {
-        width: 100% !important;
-        max-width: 380px !important;
-        height: 420px !important;
-      }
-
-      .scroller-window {
-        flex-direction: column !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        align-items: center !important;
-        gap: 0 !important;
-        padding: 14px 10px !important;
-      }
-
-      .layer-wrapper {
-        flex-direction: column !important;
-        align-items: center !important;
-        width: 100% !important;
-      }
-
-      .layer-node {
-        width: 100% !important;
-        max-width: 220px !important;
-        padding: 12px 10px !important;
-      }
-
-      .layer-conn {
-        width: 3px !important;
-        height: 20px !important;
-      }
-      .layer-conn .l-signal {
-        width: 100% !important;
-        height: 50% !important;
-        top: -50% !important;
-        left: 0 !important;
-        animation: signalY 0.5s linear infinite !important;
-      }
-    }
-
-    /* Signal Animations */
-    @keyframes signalX {
-      0% { left: -30px; opacity: 0; }
-      20% { opacity: 1; }
-      80% { opacity: 1; }
-      100% { left: 100%; opacity: 0; }
-    }
-
-    @keyframes signalY {
-      0% { top: -30px; opacity: 0; }
-      20% { opacity: 1; }
-      80% { opacity: 1; }
-      100% { top: 100%; opacity: 0; }
-    }
-
-    /* ==========================================================================
-       MAIN CONNECTORS (Hardware Bus Conduit)
-       ========================================================================== */
-    .connector {
-      position: relative;
-      background: var(--bus-track);
-      border: 1px solid var(--border-subtle);
-      overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.9);
-      flex-shrink: 0;
-      border-radius: 2px;
-    }
-
-    .signal {
-      position: absolute;
-      background: linear-gradient(90deg, transparent, var(--glow-cyan), #ffffff, var(--glow-cyan), transparent);
-      box-shadow: 0 0 10px var(--glow-cyan);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      border-radius: 2px;
-    }
-
-    .connector.active .signal {
-      opacity: 1;
-    }
-
-    /* ==========================================================================
-       HARDWARE MACHINES (Chassis & Cards)
-       ========================================================================== */
+    /* Hardware Machines */
     .machine {
       background: linear-gradient(180deg, rgba(20, 24, 33, 0.92) 0%, rgba(12, 14, 20, 0.97) 100%);
       border: 1px solid var(--border-subtle);
       border-radius: 12px;
-      padding: 22px;
-      width: 290px;
+      padding: 20px;
       flex-shrink: 0;
       box-shadow: 
         0 20px 40px -10px rgba(0, 0, 0, 0.75),
@@ -506,29 +310,29 @@
     }
 
     .machine.active {
-      border-color: rgba(56, 189, 248, 0.5);
+      border-color: rgba(56, 189, 248, 0.55);
       box-shadow: 
         0 24px 50px -10px rgba(0, 0, 0, 0.85),
-        0 0 25px -4px rgba(56, 189, 248, 0.15),
+        0 0 25px -4px rgba(56, 189, 248, 0.2),
         inset 0 1px 0 0 rgba(56, 189, 248, 0.35);
     }
 
     .machine.done {
-      border-color: rgba(16, 185, 129, 0.4);
+      border-color: rgba(16, 185, 129, 0.45);
       box-shadow: 
         0 20px 45px -10px rgba(0, 0, 0, 0.8),
-        0 0 20px -5px rgba(16, 185, 129, 0.12),
+        0 0 20px -5px rgba(16, 185, 129, 0.15),
         inset 0 1px 0 0 rgba(16, 185, 129, 0.3);
     }
 
-    /* Machine Header & LED Indicators */
+    /* Machine Header & Status LED */
     .machine-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       border-bottom: 1px solid var(--border-subtle);
-      padding-bottom: 12px;
+      padding-bottom: 10px;
     }
 
     .machine-title {
@@ -547,6 +351,7 @@
       background: #242938;
       box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);
       transition: all 0.35s ease;
+      flex-shrink: 0;
     }
 
     .machine.active .status-light {
@@ -584,13 +389,13 @@
     }
 
     /* ==========================================================================
-       GLASS WINDOW & FLYING TOKEN TRANSFORM PHYSICS
+       4. GLASS WINDOW & FLYING TOKEN PHYSICS
        ========================================================================== */
     .glass-window {
       background: linear-gradient(180deg, #07090d 0%, #0c0e14 100%);
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
-      height: 125px;
+      height: 120px;
       position: relative;
       overflow: hidden;
       display: flex;
@@ -599,13 +404,12 @@
         inset 0 0 0 1px rgba(0,0,0,0.5);
     }
 
-    /* High-Precision Hardware Flying Token */
     .flying-token {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate3d(-150%, -50%, 0) scale(0.85);
-      padding: 10px 18px;
+      padding: 8px 16px;
       border-radius: 8px;
       background: linear-gradient(135deg, #151924 0%, #0d1017 100%);
       border: 1px solid var(--border-medium);
@@ -618,6 +422,7 @@
       opacity: 0;
       pointer-events: none;
       z-index: 10;
+      max-width: 90%;
       transition: 
         transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
         opacity 0.32s ease,
@@ -630,22 +435,22 @@
     .flying-token.fly-in {
       transform: translate3d(-50%, -50%, 0) scale(1.04);
       opacity: 1;
-      border-color: rgba(56, 189, 248, 0.4);
+      border-color: rgba(56, 189, 248, 0.45);
       box-shadow: 
         0 14px 32px -4px rgba(0, 0, 0, 0.9),
-        0 0 18px -3px rgba(56, 189, 248, 0.2),
+        0 0 18px -3px rgba(56, 189, 248, 0.25),
         inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
     }
 
     .flying-token.glow {
-      border-color: rgba(56, 189, 248, 0.75);
+      border-color: rgba(56, 189, 248, 0.8);
       background: linear-gradient(135deg, #182236 0%, #0e1524 100%);
       box-shadow: 
         0 16px 36px -4px rgba(0, 0, 0, 0.95),
-        0 0 25px 0px rgba(56, 189, 248, 0.3),
+        0 0 25px 0px rgba(56, 189, 248, 0.35),
         inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
         inset 0 0 12px rgba(56, 189, 248, 0.15);
-      transform: translate3d(-50%, -50%, 0) scale(1.07);
+      transform: translate3d(-50%, -50%, 0) scale(1.06);
     }
 
     .flying-token.fly-out {
@@ -658,22 +463,30 @@
 
     .token-word {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 600;
       color: #ffffff;
       letter-spacing: 0.02em;
       text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
     }
 
     .token-data {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       color: var(--glow-cyan);
-      margin-top: 5px;
+      margin-top: 4px;
       font-weight: 400;
       opacity: 0;
       transition: opacity 0.3s ease;
       letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
     }
 
     .flying-token.glow .token-data {
@@ -681,17 +494,19 @@
     }
 
     /* ==========================================================================
-       16 LAYERS RACK (Decoder Stack)
+       5. 16 LAYERS RACK (Decoder Stack)
        ========================================================================== */
     .scroller-window {
       flex: 1;
       background: #080a0e;
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
-      padding: 16px;
+      padding: 14px;
       display: flex;
       scroll-behavior: smooth;
       box-shadow: inset 0 2px 8px rgba(0,0,0,0.7);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.15) rgba(0,0,0,0.5);
     }
 
     .scroller-window::-webkit-scrollbar {
@@ -703,7 +518,7 @@
       border-radius: 3px;
     }
     .scroller-window::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.14);
       border-radius: 3px;
     }
     .scroller-window::-webkit-scrollbar-thumb:hover {
@@ -717,19 +532,21 @@
     }
 
     .layer-node {
-      width: 115px;
-      padding: 14px 10px;
+      width: 110px;
+      padding: 12px 8px;
       background: #0e1118;
       border: 1px solid var(--border-subtle);
       border-radius: 6px;
       text-align: center;
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+      flex-shrink: 0;
+      user-select: none;
     }
 
     .layer-node .l-title {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 600;
       color: var(--text-dim);
       letter-spacing: 0.03em;
@@ -737,17 +554,17 @@
 
     .layer-node .l-sub {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.62rem;
+      font-size: 0.6rem;
       color: #475569;
-      margin-top: 4px;
+      margin-top: 3px;
       font-weight: 300;
     }
 
     .layer-node.active {
       border-color: var(--glow-cyan);
-      background: rgba(56, 189, 248, 0.08);
+      background: rgba(56, 189, 248, 0.09);
       box-shadow: 
-        0 0 18px -2px rgba(56, 189, 248, 0.25),
+        0 0 18px -2px rgba(56, 189, 248, 0.28),
         inset 0 1px 0 0 rgba(56, 189, 248, 0.35);
     }
     .layer-node.active .l-title {
@@ -761,7 +578,7 @@
     }
     .layer-node.processed:hover {
       border-color: var(--glow-green);
-      background: rgba(16, 185, 129, 0.1);
+      background: rgba(16, 185, 129, 0.12);
       transform: translateY(-2px);
     }
     .layer-node.processed .l-title {
@@ -769,7 +586,7 @@
     }
     .layer-node.processed .l-sub {
       color: #10b981;
-      opacity: 0.8;
+      opacity: 0.85;
     }
 
     .layer-conn {
@@ -793,16 +610,16 @@
     }
 
     /* ==========================================================================
-       LM HEAD & PROBABILITY LOGITS
+       6. LM HEAD & OUTPUT CARDS
        ========================================================================== */
     .lm-probs-container {
       background: #080a0e;
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
-      padding: 14px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 6px;
       overflow: hidden;
       opacity: 0;
       transition: opacity 0.45s ease;
@@ -818,14 +635,27 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.74rem;
-      padding: 7px 11px;
+      font-size: 0.72rem;
+      padding: 6px 10px;
       background: rgba(255, 255, 255, 0.02);
       border-radius: 5px;
       border: 1px solid var(--border-subtle);
       color: #cbd5e1;
       transition: all 0.2s ease;
       font-family: 'JetBrains Mono', monospace;
+      gap: 8px;
+    }
+
+    .prob-row > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .prob-row > span:last-child {
+      flex-shrink: 0;
+      font-weight: 600;
     }
 
     .prob-row.winner {
@@ -840,18 +670,15 @@
       text-align: center;
       font-size: 0.65rem;
       color: #64748b;
-      margin-top: 6px;
+      margin-top: 4px;
       font-style: italic;
       letter-spacing: 0.02em;
     }
 
-    /* ==========================================================================
-       OUTPUT CHASSIS & FINAL CARD
-       ========================================================================== */
     .output-container {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       opacity: 0;
       transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
       flex: 1;
@@ -866,7 +693,7 @@
       background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(5, 46, 35, 0.1) 100%);
       border: 1px solid rgba(16, 185, 129, 0.45);
       border-radius: 8px;
-      padding: 16px;
+      padding: 14px;
       text-align: center;
       box-shadow: 
         0 10px 25px -5px rgba(16, 185, 129, 0.15),
@@ -875,11 +702,12 @@
 
     .final-word {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.5rem;
+      font-size: 1.45rem;
       color: #34d399;
       font-weight: 700;
       margin-bottom: 4px;
       letter-spacing: 0.02em;
+      word-break: break-word;
     }
 
     .final-id {
@@ -893,15 +721,14 @@
       border: 1px solid var(--border-subtle);
       border-radius: 6px;
       padding: 12px 14px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: #cbd5e1;
       line-height: 1.5;
       box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+      word-break: break-word;
     }
 
-    /* ==========================================================================
-       SUMMARY BUTTONS & 16-LAYER TELEMETRY MODAL
-       ========================================================================== */
+    /* Summary Buttons */
     .summary-btn {
       width: 100%;
       margin-top: 14px;
@@ -933,14 +760,16 @@
       box-shadow: 0 0 15px -3px rgba(56, 189, 248, 0.25);
     }
 
-    /* Modal Backdrop with Cinematic Blur */
+    /* ==========================================================================
+       7. MODALS (TOKENIZER, EMBEDDING, ATTENTION HEATMAPS & MOE)
+       ========================================================================== */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(5, 7, 10, 0.76);
+      background: rgba(5, 7, 10, 0.78);
       backdrop-filter: blur(24px) saturate(180%) brightness(0.7);
       -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(0.7);
       display: flex;
@@ -949,7 +778,8 @@
       z-index: 1000;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      padding: 16px;
     }
 
     .modal-overlay.active {
@@ -957,7 +787,6 @@
       pointer-events: auto;
     }
 
-    /* Modal Chassis Container */
     .modal-content {
       background: linear-gradient(180deg, #12151e 0%, #0a0c12 100%);
       border: 1px solid var(--border-medium);
@@ -965,14 +794,16 @@
         0 25px 65px -10px rgba(0, 0, 0, 0.9),
         0 0 0 1px rgba(0, 0, 0, 0.6),
         inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 28px;
-      width: 95%;
-      max-width: 940px;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 920px;
       max-height: 86vh;
       overflow-y: auto;
-      transform: translateY(28px) scale(0.97);
-      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+      transform: translateY(24px) scale(0.97);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+      scrollbar-width: thin;
+      scrollbar-color: var(--glow-cyan) rgba(0, 0, 0, 0.6);
     }
 
     .modal-overlay.active .modal-content {
@@ -980,29 +811,29 @@
     }
 
     .modal-content::-webkit-scrollbar {
-      width: 7px;
+      width: 6px;
     }
     .modal-content::-webkit-scrollbar-track {
       background: rgba(0, 0, 0, 0.6);
-      border-radius: 4px;
+      border-radius: 3px;
     }
     .modal-content::-webkit-scrollbar-thumb {
       background: var(--glow-cyan);
-      border-radius: 4px;
+      border-radius: 3px;
     }
 
     .modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 22px;
+      margin-bottom: 18px;
       border-bottom: 1px solid var(--border-subtle);
-      padding-bottom: 14px;
+      padding-bottom: 12px;
     }
 
     .modal-header h3 {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 600;
       letter-spacing: 0.03em;
     }
@@ -1011,9 +842,9 @@
       background: transparent;
       border: none;
       color: var(--text-dim);
-      font-size: 1.6rem;
+      font-size: 1.5rem;
       cursor: pointer;
-      transition: color 0.25s ease;
+      transition: color 0.2s ease;
       line-height: 1;
       padding: 4px;
     }
@@ -1022,87 +853,88 @@
       color: var(--glow-orange);
     }
 
-    /* Modal Data Rows */
     .data-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 14px;
+      padding: 10px 12px;
       background: #080a0e;
       border: 1px solid var(--border-subtle);
       border-radius: 6px;
       margin-bottom: 8px;
       font-family: 'JetBrains Mono', monospace;
+      gap: 12px;
     }
 
     .data-word {
       font-weight: 600;
       color: #f1f5f9;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
+      word-break: break-word;
     }
 
     .data-value {
-      font-size: 0.78rem;
+      font-size: 0.74rem;
+      word-break: break-all;
     }
 
     .layer-vector-box {
       background: #08090d;
       border: 1px solid var(--border-subtle);
-      padding: 14px;
+      padding: 12px;
       border-radius: 6px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .layer-vector-box.out {
       border-color: rgba(16, 185, 129, 0.35);
     }
     .vector-text {
-      font-size: 0.74rem;
+      font-size: 0.72rem;
       color: var(--text-muted);
       line-height: 1.6;
+      word-break: break-all;
     }
     .vector-text span {
       color: var(--glow-cyan);
     }
 
-    /* ==========================================================================
-       HEATMAPS & MOE ROUTING IN LAYER MODAL
-       ========================================================================== */
+    /* Modal Grid (Heatmaps & MoE) */
     .layer-modal-grid {
       display: grid;
       grid-template-columns: 1fr 310px;
-      gap: 28px;
+      gap: 24px;
     }
 
     .lm-section-title {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 600;
       color: var(--glow-cyan);
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       border-bottom: 1px dashed var(--border-medium);
-      padding-bottom: 8px;
+      padding-bottom: 6px;
     }
 
-    /* 16 Attention Head Heatmaps */
     .heatmaps-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
+      gap: 8px;
     }
 
     .head-card {
       background: #080a0e;
       border: 1px solid var(--border-subtle);
       border-radius: 6px;
-      padding: 10px 8px;
+      padding: 8px 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      transition: all 0.25s ease;
+      gap: 6px;
+      transition: all 0.2s ease;
       box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+      min-width: 0;
     }
 
     .head-card:hover {
@@ -1113,7 +945,7 @@
 
     .head-title {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.65rem;
+      font-size: 0.62rem;
       color: var(--text-dim);
       font-weight: 500;
       letter-spacing: 0.04em;
@@ -1129,24 +961,23 @@
     }
 
     .hm-cell {
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       background: #151a24;
       border-radius: 2px;
-      transition: transform 0.2s ease, background 0.25s ease;
+      transition: transform 0.2s ease, background 0.2s ease;
       cursor: crosshair;
     }
 
     .hm-cell:hover {
-      transform: scale(1.35);
+      transform: scale(1.4);
       z-index: 5;
     }
 
-    /* MoE Top 8 Routing Panel */
     .moe-list {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 7px;
     }
 
     .moe-row {
@@ -1154,7 +985,7 @@
       align-items: center;
       background: #080a0e;
       border: 1px solid var(--border-subtle);
-      padding: 8px 12px;
+      padding: 8px 10px;
       border-radius: 6px;
       transition: all 0.2s ease;
       font-family: 'JetBrains Mono', monospace;
@@ -1166,10 +997,11 @@
     }
 
     .moe-id {
-      font-size: 0.74rem;
+      font-size: 0.72rem;
       font-weight: 500;
       color: var(--text-main);
-      width: 48px;
+      width: 44px;
+      flex-shrink: 0;
     }
 
     .moe-bar-wrap {
@@ -1177,7 +1009,7 @@
       height: 6px;
       background: #050608;
       border-radius: 3px;
-      margin: 0 10px;
+      margin: 0 8px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.04);
     }
@@ -1190,23 +1022,18 @@
     }
 
     .moe-val {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       font-weight: 600;
       color: #c084fc;
-      width: 45px;
+      width: 42px;
       text-align: right;
+      flex-shrink: 0;
     }
 
     /* Fallback CSS Staggered Entrance Animations */
     @keyframes cardEntrance {
-      0% {
-        opacity: 0;
-        transform: translateY(14px) scale(0.95);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
+      0% { opacity: 0; transform: translateY(12px) scale(0.95); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     .modal-overlay.active .head-card {
@@ -1232,14 +1059,377 @@
     .modal-overlay.active .moe-row {
       animation: cardEntrance 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
-    .modal-overlay.active .moe-row:nth-child(1) { animation-delay: 0.08s; }
-    .modal-overlay.active .moe-row:nth-child(2) { animation-delay: 0.12s; }
-    .modal-overlay.active .moe-row:nth-child(3) { animation-delay: 0.16s; }
-    .modal-overlay.active .moe-row:nth-child(4) { animation-delay: 0.20s; }
-    .modal-overlay.active .moe-row:nth-child(5) { animation-delay: 0.24s; }
-    .modal-overlay.active .moe-row:nth-child(6) { animation-delay: 0.28s; }
-    .modal-overlay.active .moe-row:nth-child(7) { animation-delay: 0.32s; }
-    .modal-overlay.active .moe-row:nth-child(8) { animation-delay: 0.36s; }
+    .modal-overlay.active .moe-row:nth-child(1) { animation-delay: 0.06s; }
+    .modal-overlay.active .moe-row:nth-child(2) { animation-delay: 0.10s; }
+    .modal-overlay.active .moe-row:nth-child(3) { animation-delay: 0.14s; }
+    .modal-overlay.active .moe-row:nth-child(4) { animation-delay: 0.18s; }
+    .modal-overlay.active .moe-row:nth-child(5) { animation-delay: 0.22s; }
+    .modal-overlay.active .moe-row:nth-child(6) { animation-delay: 0.26s; }
+    .modal-overlay.active .moe-row:nth-child(7) { animation-delay: 0.30s; }
+    .modal-overlay.active .moe-row:nth-child(8) { animation-delay: 0.34s; }
+
+    /* ==========================================================================
+       8. RESPONSIVE BREAKPOINTS (DESKTOP vs TABLET vs MOBILE)
+       ========================================================================== */
+
+    /* --- DESKTOP VIEWPORT (min-width: 1024px) --- */
+    @media (min-width: 1024px) {
+      .pipeline-container {
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        padding: 60px 48px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        min-height: calc(100vh - 135px);
+      }
+
+      .pipeline-container::-webkit-scrollbar {
+        height: 7px;
+      }
+      .pipeline-container::-webkit-scrollbar-track {
+        background: rgba(10, 12, 17, 0.8);
+      }
+      .pipeline-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .pipeline-container::-webkit-scrollbar-thumb:hover {
+        background: var(--glow-cyan);
+      }
+
+      .machine {
+        width: 290px;
+      }
+
+      /* Horizontal Connectors */
+      .connector-main {
+        width: 54px;
+        height: 4px;
+        margin: 0;
+        background: var(--bus-track);
+        border: 1px solid var(--border-subtle);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .connector-main .signal {
+        position: absolute;
+        height: 100%;
+        width: 28px;
+        left: -30px;
+        top: 0;
+        background: linear-gradient(90deg, transparent, var(--glow-cyan), #ffffff, var(--glow-cyan), transparent);
+        box-shadow: 0 0 10px var(--glow-cyan);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .connector.active .signal {
+        opacity: 1;
+        animation: signalX 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      .layers-machine {
+        width: 520px;
+        height: 275px;
+      }
+
+      .scroller-window {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        align-items: center;
+      }
+
+      .layer-wrapper {
+        flex-direction: row;
+      }
+
+      .layer-conn {
+        width: 26px;
+        height: 3px;
+      }
+      .layer-conn .l-signal {
+        height: 100%;
+        width: 50%;
+        left: -50%;
+        top: 0;
+      }
+      .layer-conn.active .l-signal {
+        opacity: 1;
+        animation: signalX 0.6s linear infinite;
+      }
+    }
+
+    /* Keyframes for Horizontal Laser Pulses */
+    @keyframes signalX {
+      0% { left: -30px; }
+      100% { left: calc(100% + 5px); }
+    }
+
+    /* Keyframes for Vertical Laser Pulses */
+    @keyframes signalY {
+      0% { top: -25px; }
+      100% { top: calc(100% + 5px); }
+    }
+
+    /* --- TABLET & MOBILE VERTICAL TIMELINE BASE (max-width: 1023px) --- */
+    @media (max-width: 1023px) {
+      .top-bar {
+        padding: 14px 18px;
+        padding-top: max(12px, env(safe-area-inset-top));
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+        gap: 10px;
+      }
+
+      .top-bar-meta {
+        font-size: 0.6rem;
+      }
+
+      .original-prompt {
+        font-size: 0.95rem;
+        padding: 8px 14px;
+        line-height: 1.35;
+      }
+
+      .controls {
+        gap: 8px;
+      }
+
+      button {
+        padding: 9px 16px;
+        font-size: 0.72rem;
+      }
+
+      /* Core Vertical Timeline Layout */
+      .pipeline-container {
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        padding: 24px 16px !important;
+        padding-bottom: max(60px, calc(40px + env(safe-area-inset-bottom))) !important;
+        width: 100% !important;
+        max-width: 500px !important;
+        margin: 0 auto !important;
+        overflow-x: hidden !important;
+        overflow-y: visible !important;
+      }
+
+      .machine {
+        width: 100% !important;
+        max-width: 440px !important;
+        margin: 0 auto !important;
+        padding: 18px 16px !important;
+      }
+
+      /* Connectors Rotated 90° into a Vertical Spine */
+      .connector-main {
+        width: 6px !important;
+        height: 38px !important;
+        margin: 0 auto !important;
+        background: var(--bus-track) !important;
+        border: 1px solid var(--border-medium) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        display: flex !important;
+        justify-content: center !important;
+        border-radius: 3px !important;
+        box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.9) !important;
+      }
+
+      .connector-main .signal {
+        position: absolute !important;
+        width: 100% !important;
+        height: 22px !important;
+        top: -24px !important;
+        left: 0 !important;
+        background: linear-gradient(180deg, transparent, var(--glow-cyan), #ffffff, var(--glow-cyan), transparent) !important;
+        box-shadow: 0 0 10px var(--glow-cyan) !important;
+        opacity: 0 !important;
+        border-radius: 3px !important;
+        transition: opacity 0.25s ease !important;
+      }
+
+      .connector.active .signal {
+        opacity: 1 !important;
+        animation: signalY 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+      }
+
+      /* Compact Horizontal Scroller inside Layers Machine on Mobile */
+      .layers-machine {
+        width: 100% !important;
+        max-width: 440px !important;
+        height: auto !important;
+        min-height: 220px !important;
+      }
+
+      .scroller-window {
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        align-items: center !important;
+        gap: 0 !important;
+        padding: 12px 10px !important;
+        height: 120px !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+
+      .layer-wrapper {
+        flex-direction: row !important;
+        align-items: center !important;
+      }
+
+      .layer-node {
+        width: 95px !important;
+        padding: 10px 6px !important;
+      }
+
+      .layer-node .l-title {
+        font-size: 0.76rem !important;
+      }
+      .layer-node .l-sub {
+        font-size: 0.58rem !important;
+      }
+
+      .layer-conn {
+        width: 18px !important;
+        height: 3px !important;
+      }
+
+      .layer-conn .l-signal {
+        height: 100% !important;
+        width: 50% !important;
+        left: -50% !important;
+        top: 0 !important;
+      }
+      .layer-conn.active .l-signal {
+        opacity: 1 !important;
+        animation: signalX 0.5s linear infinite !important;
+      }
+
+      /* Responsive Modal */
+      .modal-content {
+        padding: 18px 14px !important;
+        max-height: 90vh !important;
+      }
+
+      .layer-modal-grid {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+      }
+    }
+
+    /* --- STANDARD PHONES (max-width: 600px) --- */
+    @media (max-width: 600px) {
+      .top-bar {
+        padding: 10px 12px;
+        gap: 8px;
+      }
+
+      .top-bar-meta {
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+      }
+
+      .original-prompt {
+        font-size: 0.88rem;
+        padding: 6px 10px;
+        line-height: 1.3;
+      }
+
+      .controls {
+        gap: 6px;
+      }
+
+      button {
+        padding: 8px 12px;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+        flex: 1 1 auto;
+      }
+
+      .pipeline-container {
+        padding: 18px 12px !important;
+      }
+
+      .machine {
+        padding: 14px 12px !important;
+        border-radius: 10px !important;
+      }
+
+      .glass-window {
+        height: 105px !important;
+      }
+
+      .flying-token {
+        padding: 7px 12px !important;
+      }
+
+      .token-word {
+        font-size: 0.9rem !important;
+      }
+      .token-data {
+        font-size: 0.6rem !important;
+      }
+
+      .heatmaps-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 6px !important;
+      }
+
+      .head-card {
+        padding: 6px 3px !important;
+      }
+      .head-title {
+        font-size: 0.58rem !important;
+      }
+      .hm-cell {
+        width: 7.5px !important;
+        height: 7.5px !important;
+      }
+    }
+
+    /* --- NARROW MOBILE SCREENS (max-width: 380px) --- */
+    @media (max-width: 380px) {
+      .top-bar {
+        padding: 8px 10px;
+      }
+      .original-prompt {
+        font-size: 0.82rem;
+      }
+      button {
+        padding: 7px 10px;
+        font-size: 0.66rem;
+      }
+      .pipeline-container {
+        padding: 14px 8px !important;
+      }
+      .machine {
+        padding: 12px 10px !important;
+      }
+      .machine-title {
+        font-size: 0.75rem !important;
+      }
+      .zoom-btn {
+        font-size: 0.58rem !important;
+        padding: 2px 6px !important;
+      }
+      .layer-node {
+        width: 82px !important;
+      }
+      .heatmaps-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 6px !important;
+      }
+      .hm-cell {
+        width: 9px !important;
+        height: 9px !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1269,7 +1459,7 @@
     <!-- 1. TOKENIZER -->
     <div class="machine" id="mach-tokenizer">
       <div class="machine-header">
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <span class="machine-title">Tokenizer</span>
           <button class="zoom-btn" onclick="window.open('tokenizer-zoom.html', '_blank')">⤢ ZOOM</button>
         </div>
@@ -1289,7 +1479,7 @@
     <!-- 2. EMBEDDING -->
     <div class="machine" id="mach-embedding">
       <div class="machine-header">
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <span class="machine-title">Embedding (W_E)</span>
           <button class="zoom-btn" onclick="window.open('embedding-zoom.html', '_blank')">⤢ ZOOM</button>
         </div>
@@ -1309,7 +1499,7 @@
     <!-- 3. 16 LAYERS RACK -->
     <div class="machine layers-machine" id="mach-layers">
       <div class="machine-header">
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <span class="machine-title">16x Decoder Blocks</span>
           <button class="zoom-btn" onclick="window.open('layer-zoom.html', '_blank')">⤢ ZOOM</button>
         </div>
@@ -1323,7 +1513,7 @@
     <!-- 4. LM HEAD (Probabilities) -->
     <div class="machine" id="mach-lmhead">
       <div class="machine-header">
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <span class="machine-title">LM Head Output</span>
           <button class="zoom-btn" onclick="window.open('lm-head-zoom.html', '_blank')">⤢ ZOOM</button>
         </div>
@@ -1475,7 +1665,7 @@
       const comets = new THREE.Points(cometGeo, cometMat);
       scene.add(comets);
 
-      // Mouse Parallax & Scroll Reactivity
+      // Mouse & Touch Parallax
       let mouseX = 0, mouseY = 0;
       let targetX = 0, targetY = 0;
       let scrollRatio = 0;
@@ -1483,6 +1673,13 @@
       window.addEventListener('mousemove', (e) => {
         targetX = (e.clientX / window.innerWidth - 0.5) * 2;
         targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length > 0) {
+          targetX = (e.touches[0].clientX / window.innerWidth - 0.5) * 2;
+          targetY = (e.touches[0].clientY / window.innerHeight - 0.5) * 2;
+        }
       }, { passive: true });
 
       const pipeEl = document.getElementById('pipe-container');
@@ -1587,6 +1784,32 @@
         });
       });
       observer.observe(modalEl, { attributes: true });
+    })();
+
+    // Smart Mobile Timeline Auto-Follow (Smoothly follows active machine)
+    (function initMobileTimelineFollow() {
+      const machines = ['mach-tokenizer', 'mach-embedding', 'mach-layers', 'mach-lmhead', 'mach-output'];
+      machines.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el || !window.MutationObserver) return;
+
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((m) => {
+            if (m.attributeName === 'class' && el.classList.contains('active')) {
+              if (window.innerWidth < 1024) {
+                const rect = el.getBoundingClientRect();
+                const topBar = document.querySelector('.top-bar');
+                const topBarHeight = topBar ? topBar.offsetHeight : 100;
+                
+                // If element is not already well-centered
+                const targetY = window.pageYOffset + rect.top - topBarHeight - 16;
+                window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+              }
+            }
+          });
+        });
+        observer.observe(el, { attributes: true });
+      });
     })();
   </script>
 

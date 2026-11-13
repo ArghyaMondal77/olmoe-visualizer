@@ -2,134 +2,362 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Micro-Math // SwiGLU Expert Compute</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-void: #050507;
+      --bg-surface: #0a0c10;
+      --bg-elevated: #11141c;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-medium: rgba(255, 255, 255, 0.15);
       --core-green: #10b981;
       --attn-cyan: #0ea5e9;
       --moe-purple: #8b5cf6;
+      --moe-light: #c4b5fd;
       --alert-red: #f43f5e;
       --val-orange: #f59e0b;
       --text-main: #f8fafc;
+      --text-muted: #94a3b8;
       --text-dim: #64748b;
-      --glass: rgba(15, 15, 20, 0.8);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', sans-serif; background-color: var(--bg-void); color: var(--text-main);
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-void);
+      color: var(--text-main);
       overflow-x: hidden;
       background-image: 
-        radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
-        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
-      background-size: 100% 100%, 40px 40px, 40px 40px;
-      display: flex; flex-direction: column; align-items: center; min-height: 100vh;
-      scroll-behavior: smooth; padding-bottom: 120px;
+        radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.06) 0%, transparent 60%),
+        linear-gradient(to right, rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 100% 100%, 32px 32px, 32px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      scroll-behavior: smooth;
+      padding-bottom: 140px;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* TOP BAR */
     .top-bar {
-      width: 100%; height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.9);
-      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between;
-      align-items: center; backdrop-filter: blur(12px); position: fixed; top: 0; z-index: 200;
+      width: 100%;
+      height: clamp(56px, 7vw, 70px);
+      padding: 0 clamp(16px, 4vw, 40px);
+      background: rgba(5, 5, 7, 0.88);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: fixed;
+      top: 0;
+      z-index: 200;
     }
     .btn-back {
-      background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 8px 18px;
-      font-size: 0.7rem; cursor: pointer; border-radius: 4px; text-transform: uppercase;
-      letter-spacing: 2px; transition: all 0.3s; font-family: 'JetBrains Mono', monospace; font-weight: 700;
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      border: 1px solid var(--border-medium);
+      padding: 8px clamp(12px, 2vw, 18px);
+      font-size: 0.68rem;
+      cursor: pointer;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      transition: all 0.25s ease;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      white-space: nowrap;
     }
-    .btn-back:hover { color: #fff; border-color: var(--moe-purple); box-shadow: 0 0 15px rgba(139, 92, 246, 0.2); }
+    .btn-back:hover {
+      color: #fff;
+      border-color: var(--moe-purple);
+      box-shadow: 0 0 16px rgba(139, 92, 246, 0.25);
+    }
+
+    .top-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.6rem, 1.8vw, 0.75rem);
+      letter-spacing: clamp(1px, 0.4vw, 3px);
+      color: var(--text-dim);
+      font-weight: 400;
+      text-align: right;
+    }
+    .top-badge span { color: #fff; font-weight: 600; }
 
     /* CONTENT LAYOUT */
     .content-wrapper {
-      width: 100%; max-width: 1000px; padding: 100px 20px 40px 20px;
-      display: flex; flex-direction: column; gap: 80px;
+      width: 100%;
+      max-width: 1000px;
+      padding: clamp(80px, 12vw, 110px) clamp(14px, 3vw, 24px) 40px clamp(14px, 3vw, 24px);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(40px, 7vw, 75px);
     }
 
     /* HEADER */
-    .math-header { text-align: center; }
-    .math-title { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; color: var(--moe-purple); letter-spacing: 2px; margin-bottom: 20px; }
+    .math-header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .math-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.3rem, 3.5vw, 1.85rem);
+      color: var(--moe-purple);
+      letter-spacing: 0.5px;
+      font-weight: 700;
+    }
     
     .formula-box {
-      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);
-      padding: 25px 40px; border-radius: 8px; display: inline-block;
-      font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #cbd5e1;
-      box-shadow: inset 0 0 20px rgba(0,0,0,0.5); letter-spacing: 1px; line-height: 1.8;
+      background: rgba(10, 14, 22, 0.85);
+      border: 1px solid var(--border-subtle);
+      padding: clamp(16px, 3.5vw, 25px) clamp(16px, 4vw, 40px);
+      border-radius: 8px;
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.85rem, 2.3vw, 1.15rem);
+      color: #cbd5e1;
+      box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.6);
+      letter-spacing: 0.5px;
+      line-height: 1.8;
       text-align: left;
+      width: 100%;
+      max-width: 780px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .fm-hl { color: var(--attn-cyan); font-weight: bold; }
     .fm-p { color: var(--moe-purple); font-weight: bold; }
 
-    /* ========================================= */
-    /* VERTICAL PIPELINE STEPS                   */
-    /* ========================================= */
+    /* PIPELINE STEPS */
     .pipeline-step {
-      display: flex; flex-direction: column; gap: 20px; opacity: 0; transform: translateY(40px);
-      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      opacity: 0;
+      transform: translateY(35px);
+      transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
     }
-    .pipeline-step.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .pipeline-step.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
 
     .step-title {
-      font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: #fff;
-      border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 20px;
-      display: flex; justify-content: space-between; align-items: flex-end;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.95rem, 2.5vw, 1.2rem);
+      color: #fff;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
     }
-    .step-desc { font-family: 'Inter', sans-serif; font-size: 0.9rem; color: var(--text-dim); font-weight: 300; max-width: 600px;}
+    .step-desc {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+      color: var(--text-muted);
+      font-weight: 400;
+      max-width: 600px;
+      line-height: 1.6;
+    }
 
     /* VISUAL NODES */
-    .node-grid { display: flex; justify-content: center; gap: 40px; align-items: center; }
+    .node-grid {
+      display: flex;
+      justify-content: center;
+      gap: clamp(16px, 3.5vw, 40px);
+      align-items: center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
     
     .data-node {
-      background: #0a0a0d; border: 1px solid #334155; padding: 25px; border-radius: 12px;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-width: 280px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-medium);
+      padding: clamp(16px, 3vw, 25px);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 250px;
+      width: 100%;
+      max-width: 320px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      position: relative;
+      transition: all 0.4s ease;
     }
-    .data-node.glow-p { border-color: var(--moe-purple); box-shadow: 0 0 30px rgba(139, 92, 246, 0.15); background: rgba(139, 92, 246, 0.05); }
-    .data-node.glow-c { border-color: var(--attn-cyan); box-shadow: 0 0 30px rgba(14, 165, 233, 0.15); background: rgba(14, 165, 233, 0.05); }
-    .data-node.glow-g { border-color: var(--core-green); box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); background: rgba(16, 185, 129, 0.05); }
+    .data-node.glow-p {
+      border-color: var(--moe-purple);
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.15);
+      background: rgba(139, 92, 246, 0.05);
+    }
+    .data-node.glow-c {
+      border-color: var(--attn-cyan);
+      box-shadow: 0 0 30px rgba(14, 165, 233, 0.15);
+      background: rgba(14, 165, 233, 0.05);
+    }
+    .data-node.glow-g {
+      border-color: var(--core-green);
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+      background: rgba(16, 185, 129, 0.05);
+    }
 
-    .n-title { font-size: 0.85rem; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 15px; font-weight: 600; }
-    .n-val { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; color: #fff; font-weight: bold; margin-bottom: 15px; }
+    .n-title {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .n-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(1.2rem, 3vw, 1.5rem);
+      color: #fff;
+      font-weight: bold;
+      margin-bottom: 14px;
+    }
     
-    /* Shape Breakdown Boxes */
     .shape-box {
-      background: rgba(0,0,0,0.5); border: 1px dashed rgba(255,255,255,0.2); padding: 10px 15px;
-      border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #cbd5e1;
-      display: flex; flex-direction: column; gap: 5px; align-items: center; width: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: center;
+      width: 100%;
+      text-align: center;
     }
     .shape-math { color: var(--moe-light); font-weight: bold; }
 
-    /* Custom Symbols */
-    .math-symbol { font-size: 2rem; color: #475569; font-weight: bold; }
+    .math-symbol {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      color: var(--text-dim);
+      font-weight: bold;
+    }
 
-    /* FIXED CONTROLS AT BOTTOM */
+    .step-note {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      max-width: 320px;
+      line-height: 1.6;
+    }
+
+    /* FIXED CONTROLS */
     .control-deck {
-      position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(5, 5, 7, 0.95);
-      border-top: 1px solid rgba(255,255,255,0.1); padding: 20px 40px;
-      display: flex; justify-content: center; align-items: center; gap: 30px;
-      backdrop-filter: blur(20px); z-index: 200; box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(5, 5, 7, 0.92);
+      border-top: 1px solid var(--border-subtle);
+      padding: 16px clamp(16px, 4vw, 40px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: clamp(16px, 3vw, 30px);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 200;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
     }
     .btn-step {
-      background: var(--moe-purple); color: #fff; border: none; padding: 14px 32px; border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; cursor: pointer;
-      text-transform: uppercase; transition: all 0.3s; box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+      background: var(--moe-purple);
+      color: #fff;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: clamp(0.82rem, 2vw, 0.95rem);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .btn-step:hover { box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); transform: translateY(-2px); }
-    .status-text { font-family: 'Inter', sans-serif; font-size: 0.95rem; color: #cbd5e1; max-width: 600px; line-height: 1.5; }
+    .btn-step:hover {
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+      transform: translateY(-1px);
+    }
+    .status-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(0.82rem, 2vw, 0.92rem);
+      color: #cbd5e1;
+      max-width: 600px;
+      line-height: 1.5;
+    }
 
+    /* RESPONSIVE BREAKPOINTS */
+    @media (max-width: 768px) {
+      .node-grid {
+        flex-direction: column;
+      }
+      .node-grid-left {
+        align-items: center !important;
+        padding-left: 0 !important;
+      }
+      .step-note {
+        margin-left: 0 !important;
+        text-align: center;
+      }
+      .control-deck {
+        flex-direction: column-reverse;
+        padding: 12px 16px max(14px, env(safe-area-inset-bottom));
+        gap: 10px;
+      }
+      .btn-step {
+        width: 100%;
+        max-width: 360px;
+        text-align: center;
+      }
+      .status-text {
+        text-align: center;
+        max-width: 100%;
+        font-size: 0.8rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .top-bar { padding: 0 12px; }
+      .data-node { min-width: unset; width: 100%; }
+    }
   </style>
 </head>
 <body>
 
   <div class="top-bar">
     <button class="btn-back" onclick="window.close()">← Macro Topology</button>
-    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
-      MICRO-MATH <span style="color:#fff; font-weight:600;">//</span> SWIGLU EXPERT
+    <div class="top-badge">
+      MICRO-MATH <span>//</span> SWIGLU EXPERT
     </div>
   </div>
 
@@ -138,11 +366,11 @@
     <div class="math-header">
       <div class="math-title">SwiGLU Expert Network Operations</div>
       <div class="formula-box">
-        <div style="color:#64748b; font-size:0.8rem; margin-bottom:5px; text-transform:uppercase;">1. The SwiGLU Feed-Forward Compute</div>
+        <div style="color:var(--text-dim); font-size:0.75rem; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px;">1. The SwiGLU Feed-Forward Compute</div>
         y<sub>expert</sub> = 
         ( <span class="fm-hl">SiLU</span>(<span class="fm-p">x</span> · W<sub>1</sub>) ⊗ (<span class="fm-p">x</span> · W<sub>3</sub>) ) · W<sub>2</sub>
         <br><br>
-        <div style="color:#64748b; font-size:0.8rem; margin-bottom:5px; text-transform:uppercase;">2. The Sparse Routing Output</div>
+        <div style="color:var(--text-dim); font-size:0.75rem; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px;">2. The Sparse Routing Output</div>
         Final Output = <span class="fm-p">Router_Probability</span> × y<sub>expert</sub>
       </div>
     </div>
@@ -167,7 +395,7 @@
     <!-- STEP 1: PARALLEL EXPANSION -->
     <div class="pipeline-step" id="step-1">
       <div class="step-title">
-        <span>01 // PARALLEL EXPANSION (W<sub>1</sub> & W<sub>3</sub>)</span>
+        <span>01 // PARALLEL EXPANSION (W<sub>1</sub> &amp; W<sub>3</sub>)</span>
         <span class="step-desc">The 2048D token is duplicated and expanded simultaneously by two massive weight matrices into an 8192D latent space.</span>
       </div>
       <div class="node-grid">
@@ -181,7 +409,7 @@
           </div>
         </div>
         
-        <div class="math-symbol">&</div>
+        <div class="math-symbol">&amp;</div>
 
         <!-- W3 Branch -->
         <div class="data-node glow-p">
@@ -201,7 +429,7 @@
         <span style="color: var(--attn-cyan);">02 // SiLU ACTIVATION (SWISH)</span>
         <span class="step-desc">The W<sub>1</sub> branch is passed through the SiLU non-linear curve: <code>z / (1 + e<sup>-z</sup>)</code>. This smooth curve keeps gradients healthy.</span>
       </div>
-      <div class="node-grid" style="justify-content: flex-start; padding-left: 20px;">
+      <div class="node-grid node-grid-left" style="justify-content: flex-start; padding-left: 20px;">
         <!-- SiLU applied only to W1 -->
         <div class="data-node glow-c">
           <div class="n-title">SiLU( W<sub>1</sub> Output )</div>
@@ -212,7 +440,7 @@
           </div>
         </div>
         <!-- W3 just waits -->
-        <div style="font-family: 'JetBrains Mono'; color: #64748b; font-size: 0.85rem; max-width: 300px; margin-left: 40px;">
+        <div class="step-note" style="margin-left: 40px;">
           Note: The W<sub>3</sub> branch ([-0.50]) bypasses activation entirely and acts as the "Gate".
         </div>
       </div>
@@ -225,14 +453,14 @@
         <span class="step-desc">The activated W<sub>1</sub> tensor and the raw W<sub>3</sub> tensor are multiplied element-by-element. This interacting gated logic produces vast reasoning improvements over older models.</span>
       </div>
       <div class="node-grid">
-        <div class="data-node glow-p" style="width: 400px;">
+        <div class="data-node glow-p" style="width: 100%; max-width: 400px;">
           <div class="n-title">Merged SwiGLU State</div>
           <div class="n-val">[ -0.88 ]</div>
           <div class="shape-box">
             [1, 8192] ⊗ [1, 8192]
             <span class="shape-math">➔ [1, 8192]</span>
           </div>
-          <div style="font-family: 'JetBrains Mono'; font-size: 0.75rem; color: #94a3b8; margin-top: 15px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">
             Math: 1.76 × -0.50 = -0.88
           </div>
         </div>
@@ -264,14 +492,14 @@
         <span class="step-desc">This expert was selected by the Top-8 Router with a probability score of 0.25 (25%). We scale the entire output tensor by this scalar before adding it to the residual spine.</span>
       </div>
       <div class="node-grid">
-        <div class="data-node glow-g" style="border-color: var(--core-green);">
+        <div class="data-node glow-g" style="border-color: var(--core-green); width: 100%; max-width: 380px;">
           <div class="n-title" style="color: var(--core-green);">Final Routed Output</div>
           <div class="n-val" style="color: var(--core-green);">[ 0.27 ]</div>
           <div class="shape-box" style="border-color: rgba(16, 185, 129, 0.3);">
             [1, 2048] × 0.25 (Scalar)
             <span class="shape-math" style="color: var(--core-green)">➔ [1, 2048]</span>
           </div>
-          <div style="font-family: 'JetBrains Mono'; font-size: 0.75rem; color: #94a3b8; margin-top: 15px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">
             Math: 1.10 × 0.25 = 0.27
           </div>
         </div>
@@ -344,7 +572,7 @@
         
         btnNext.innerText = "Reset Drill Down ↺";
         btnNext.style.background = 'transparent';
-        btnNext.style.border = '1px solid var(--text-dim)';
+        btnNext.style.border = '1px solid var(--border-medium)';
         step = 5;
       }
       else if (step === 5) {
@@ -363,7 +591,7 @@
           btnNext.style.background = 'var(--moe-purple)';
           btnNext.style.border = 'none';
           step = 0;
-        }, 500); // wait for scroll to top before hiding elements
+        }, 500);
       }
     }
   </script>

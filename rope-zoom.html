@@ -2,109 +2,256 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Micro-Math // RoPE</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-void: #050507;
+      --bg-surface: #0a0c10;
+      --bg-elevated: #11141c;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-medium: rgba(255, 255, 255, 0.15);
       --core-green: #10b981;
       --attn-cyan: #0ea5e9;
       --moe-purple: #8b5cf6;
       --text-main: #f8fafc;
+      --text-muted: #94a3b8;
       --text-dim: #475569;
-      --glass: rgba(15, 15, 20, 0.6);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: var(--bg-void);
       color: var(--text-main);
       overflow-x: hidden;
       background-image: 
-        radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
-        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
-      background-size: 100% 100%, 40px 40px, 40px 40px;
-      display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding-bottom: 60px;
+        radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.06) 0%, transparent 60%),
+        linear-gradient(to right, rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 100% 100%, 32px 32px, 32px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding-bottom: 60px;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* TOP BAR */
     .top-bar {
-      width: 100%; height: 70px; padding: 0 40px; background: rgba(5, 5, 7, 0.8);
-      border-bottom: 1px solid rgba(255,255,255,0.05); display: flex;
-      justify-content: space-between; align-items: center; 
-      backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 200;
+      width: 100%;
+      height: clamp(56px, 7vw, 70px);
+      padding: 0 clamp(16px, 4vw, 40px);
+      background: rgba(5, 5, 7, 0.88);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 200;
     }
     .btn-back {
-      background: transparent; color: #94a3b8; border: 1px solid #334155;
-      padding: 8px 18px; font-size: 0.7rem; cursor: pointer; border-radius: 4px;
-      text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s;
-      font-family: 'JetBrains Mono', monospace; font-weight: 700;
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      border: 1px solid var(--border-medium);
+      padding: 8px clamp(12px, 2vw, 18px);
+      font-size: 0.68rem;
+      cursor: pointer;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      transition: all 0.25s ease;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      white-space: nowrap;
     }
-    .btn-back:hover { color: #fff; border-color: var(--moe-purple); box-shadow: 0 0 15px rgba(139, 92, 246, 0.2); }
+    .btn-back:hover {
+      color: #fff;
+      border-color: var(--moe-purple);
+      box-shadow: 0 0 16px rgba(139, 92, 246, 0.25);
+    }
 
-    .content-wrapper { width: 100%; max-width: 1000px; padding: 40px 20px; display: flex; flex-direction: column; gap: 30px; }
+    .top-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.6rem, 1.8vw, 0.75rem);
+      letter-spacing: clamp(1px, 0.4vw, 3px);
+      color: var(--text-dim);
+      font-weight: 400;
+      text-align: right;
+    }
+    .top-badge span { color: #fff; font-weight: 600; }
+
+    .content-wrapper {
+      width: 100%;
+      max-width: 1000px;
+      padding: clamp(20px, 4vw, 40px) clamp(14px, 3vw, 24px);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(20px, 3.5vw, 32px);
+    }
 
     /* HEADER & FORMULA */
-    .math-header { text-align: center; margin-bottom: 10px; }
-    .math-title { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; color: var(--moe-purple); letter-spacing: 2px; margin-bottom: 15px; }
+    .math-header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .math-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.25rem, 3.2vw, 1.75rem);
+      color: var(--moe-purple);
+      letter-spacing: 0.5px;
+      font-weight: 700;
+    }
     
     .formula-box {
-      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1);
-      padding: 20px 40px; border-radius: 8px; display: inline-block;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #cbd5e1;
-      box-shadow: inset 0 0 20px rgba(0,0,0,0.5); line-height: 1.6; text-align: left;
+      background: rgba(10, 14, 22, 0.85);
+      border: 1px solid var(--border-subtle);
+      padding: clamp(14px, 3vw, 20px) clamp(16px, 4vw, 40px);
+      border-radius: 8px;
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.78rem, 2vw, 0.95rem);
+      color: #cbd5e1;
+      box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.6);
+      line-height: 1.6;
+      text-align: left;
+      width: 100%;
+      max-width: 750px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .formula-hl { color: var(--moe-purple); font-weight: 700; }
 
     /* STAGE */
     .stage {
-      background: linear-gradient(180deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.9) 100%);
-      border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
-      padding: 40px 30px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-      display: flex; flex-direction: column; align-items: center; gap: 30px;
+      background: linear-gradient(180deg, rgba(14, 18, 26, 0.75) 0%, rgba(7, 9, 14, 0.95) 100%);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: clamp(20px, 4vw, 40px) clamp(12px, 3vw, 30px);
+      position: relative;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(20px, 3.5vw, 30px);
+      width: 100%;
     }
 
     /* 6D TENSOR VIEW */
     .tensor-display {
-      display: flex; gap: 10px; align-items: center; justify-content: center;
-      background: #050507; padding: 15px 25px; border: 1px solid #334155; border-radius: 8px;
+      display: flex;
+      gap: clamp(8px, 2vw, 16px);
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-surface);
+      padding: clamp(10px, 2vw, 15px) clamp(12px, 3vw, 25px);
+      border: 1px solid var(--border-medium);
+      border-radius: 8px;
+      flex-wrap: wrap;
+      max-width: 100%;
     }
-    .dim-pair { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    .dim-label { font-size: 0.65rem; color: #64748b; letter-spacing: 1px; }
-    .dim-vals { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700; display: flex; gap: 10px; }
+    .dim-pair {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .dim-label {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+    .dim-vals {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.75rem, 2vw, 0.9rem);
+      font-weight: 700;
+      display: flex;
+      gap: 6px;
+      white-space: nowrap;
+    }
     
     .pair-1 .dim-vals { color: var(--attn-cyan); text-shadow: 0 0 10px rgba(14, 165, 233, 0.4); }
     .pair-2 .dim-vals { color: var(--moe-purple); text-shadow: 0 0 10px rgba(139, 92, 246, 0.4); }
     .pair-3 .dim-vals { color: var(--core-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
 
+    .pair-divider {
+      color: var(--border-medium);
+      font-size: 0.9rem;
+    }
+
     /* 2D ROTATION RADARS */
     .radar-container {
-      display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; width: 100%;
+      display: flex;
+      gap: clamp(16px, 3.5vw, 40px);
+      justify-content: center;
+      flex-wrap: wrap;
+      width: 100%;
     }
     
-    .radar-station { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+    .radar-station {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
     
     .radar {
-      width: 160px; height: 160px; border-radius: 50%;
-      border: 2px dashed rgba(255,255,255,0.1); position: relative;
-      background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+      width: clamp(130px, 28vw, 160px);
+      height: clamp(130px, 28vw, 160px);
+      border-radius: 50%;
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      position: relative;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
     }
     /* Axes */
-    .radar::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: rgba(255,255,255,0.15); }
-    .radar::after { content: ''; position: absolute; left: 50%; top: 0; height: 100%; width: 1px; background: rgba(255,255,255,0.15); }
+    .radar::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .radar::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      height: 100%;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
 
     .vector-line {
-      position: absolute; top: 50%; left: 50%;
-      width: 60px; height: 2px; transform-origin: left center;
-      transition: transform 0.1s linear; /* Smooth drag */
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: clamp(45px, 10vw, 60px);
+      height: 2px;
+      transform-origin: left center;
+      transition: transform 0.08s linear;
     }
     .vector-head {
-      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
-      width: 8px; height: 8px; border-radius: 50%;
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
     }
 
     .radar-1 .vector-line { background: var(--attn-cyan); box-shadow: 0 0 10px var(--attn-cyan); }
@@ -116,51 +263,112 @@
     .radar-3 .vector-line { background: var(--core-green); box-shadow: 0 0 10px var(--core-green); }
     .radar-3 .vector-head { background: #fff; box-shadow: 0 0 10px #fff; }
 
-    .radar-info { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #94a3b8; }
+    .radar-info {
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.7rem, 1.8vw, 0.75rem);
+      color: var(--text-muted);
+    }
     .radar-info span { font-weight: 700; color: #fff; }
 
     /* CONTROLS (Slider) */
     .controls-panel {
-      width: 100%; max-width: 600px; background: rgba(0,0,0,0.4);
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-      padding: 20px 30px; display: flex; flex-direction: column; gap: 15px;
+      width: 100%;
+      max-width: 600px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: clamp(14px, 3vw, 20px) clamp(16px, 4vw, 30px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .slider-header { display: flex; justify-content: space-between; font-size: 0.85rem; color: #cbd5e1; }
-    .token-pos-display { font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; color: var(--moe-purple); font-weight: 700; }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: clamp(0.78rem, 2vw, 0.85rem);
+      color: #cbd5e1;
+    }
+    .token-pos-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+      color: var(--moe-purple);
+      font-weight: 700;
+    }
     
     input[type=range] {
-      -webkit-appearance: none; width: 100%; background: transparent; cursor: pointer;
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+      cursor: pointer;
     }
     input[type=range]::-webkit-slider-runnable-track {
-      width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
     }
     input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%;
-      background: var(--moe-purple); margin-top: -7px;
-      box-shadow: 0 0 15px var(--moe-purple); transition: transform 0.1s;
+      -webkit-appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: var(--moe-purple);
+      margin-top: -7px;
+      box-shadow: 0 0 15px var(--moe-purple);
+      transition: transform 0.1s ease;
     }
     input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
 
     /* BENTO SPECS */
-    .bento-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 10px; }
-    @media (max-width: 768px) { .bento-grid { grid-template-columns: 1fr; } }
-
-    .bento-box {
-      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(14px, 2.5vw, 20px);
+      margin-top: 10px;
     }
-    .bento-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
-    .bento-value { font-size: 0.85rem; color: #94a3b8; line-height: 1.6; }
+    .bento-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: clamp(16px, 2.5vw, 20px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .bento-label {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .bento-value {
+      font-size: clamp(0.82rem, 1.8vw, 0.88rem);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
     .bento-value span.hl { color: var(--moe-purple); font-weight: 700; }
 
+    /* RESPONSIVE BREAKPOINTS */
+    @media (max-width: 768px) {
+      .bento-grid { grid-template-columns: 1fr; }
+      .pair-divider { display: none; }
+      .tensor-display { flex-direction: column; gap: 8px; }
+    }
+
+    @media (max-width: 480px) {
+      .top-bar { padding: 0 12px; }
+    }
   </style>
 </head>
 <body>
 
   <div class="top-bar">
     <button class="btn-back" onclick="window.close()">← Macro Topology</button>
-    <div style="font-size: 0.8rem; letter-spacing: 4px; color: #64748b; font-weight: 200;">
-      MICRO-MATH <span style="color:#fff; font-weight:600;">//</span> ROPE
+    <div class="top-badge">
+      MICRO-MATH <span>//</span> ROPE
     </div>
   </div>
 
@@ -169,7 +377,7 @@
     <div class="math-header">
       <div class="math-title">Rotary Position Embedding</div>
       <div class="formula-box">
-        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px; text-transform: uppercase;">2D Rotation Matrix applied to pairs</div>
+        <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">2D Rotation Matrix applied to pairs</div>
         <span style="color:#fff">Rotation(m, θ)</span> = <br>
         [ <span class="formula-hl">cos(m·θ)</span>, -sin(m·θ) ] [ <span style="color:#fff">x<sub>0</sub></span> ]<br>
         [ sin(m·θ),  <span class="formula-hl">cos(m·θ)</span> ] [ <span style="color:#fff">x<sub>1</sub></span> ]
@@ -180,18 +388,18 @@
     <div class="stage">
       
       <!-- Current Tensor Values -->
-      <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Current 6-Dimensional State</div>
+      <div style="font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;">Current 6-Dimensional State</div>
       <div class="tensor-display">
         <div class="dim-pair pair-1">
           <div class="dim-label">DIM [0, 1]</div>
           <div class="dim-vals" id="val-1">[ 0.80,  0.40 ]</div>
         </div>
-        <div style="color: #334155;">|</div>
+        <div class="pair-divider">|</div>
         <div class="dim-pair pair-2">
           <div class="dim-label">DIM [2, 3]</div>
           <div class="dim-vals" id="val-2">[ -0.50, 0.70 ]</div>
         </div>
-        <div style="color: #334155;">|</div>
+        <div class="pair-divider">|</div>
         <div class="dim-pair pair-3">
           <div class="dim-label">DIM [4, 5]</div>
           <div class="dim-vals" id="val-3">[ 0.20,  0.90 ]</div>
@@ -240,7 +448,7 @@
           <span class="token-pos-display" id="posDisplay">0</span>
         </div>
         <input type="range" id="posSlider" min="0" max="20" value="0" step="1" oninput="updateRoPE()">
-        <div style="font-size: 0.7rem; color: #64748b; text-align: center;">Drag the slider to move the token further down the sentence.</div>
+        <div style="font-size: 0.7rem; color: var(--text-dim); text-align: center;">Drag the slider to move the token further down the sentence.</div>
       </div>
 
     </div>
@@ -265,8 +473,7 @@
 
   <script>
     // Initial Vector Values (mock coordinates for visualization)
-    // We treat these as (x,y) pairs for 3 separate 2D planes
-    const v1_0 = { r: 60, startAngle: 26 }; // length 60px, start angle 26 deg
+    const v1_0 = { r: 60, startAngle: 26 };
     const v2_0 = { r: 50, startAngle: 125 }; 
     const v3_0 = { r: 70, startAngle: 77 }; 
 
@@ -278,11 +485,10 @@
     const vec2 = document.getElementById('vec-2'); const ang2 = document.getElementById('ang-2'); const val2 = document.getElementById('val-2');
     const vec3 = document.getElementById('vec-3'); const ang3 = document.getElementById('ang-3'); const val3 = document.getElementById('val-3');
 
-    // Base Frequencies for the 3 dimensions (in degrees per position step)
-    // In real RoPE, this is Theta = 10000^(-2i/d). Here we use exaggerated visual angles.
-    const freq1 = 45.0; // Fast
-    const freq2 = 12.5; // Medium
-    const freq3 = 2.0;  // Slow
+    // Base Frequencies for the 3 dimensions
+    const freq1 = 45.0;
+    const freq2 = 12.5;
+    const freq3 = 2.0;
 
     function updateRoPE() {
       const m = parseInt(slider.value);
@@ -294,18 +500,15 @@
       const a3 = v3_0.startAngle + (m * freq3);
 
       // Rotate CSS Lines
-      vec1.style.transform = `rotate(${-a1}deg)`; // Negative because CSS rotation goes clockwise, math goes counter-clockwise
+      vec1.style.transform = `rotate(${-a1}deg)`;
       vec2.style.transform = `rotate(${-a2}deg)`;
       vec3.style.transform = `rotate(${-a3}deg)`;
 
-      // Update Angle Text (Normalized to 0-360 for display)
+      // Update Angle Text
       ang1.innerText = `${(a1 % 360).toFixed(1)}°`;
       ang2.innerText = `${(a2 % 360).toFixed(1)}°`;
       ang3.innerText = `${(a3 % 360).toFixed(1)}°`;
 
-      // Calculate Matrix Math New Coordinates
-      // x' = x*cos(θ) - y*sin(θ) -> For unit circle display we just use cos/sin of total angle
-      // In JS Math.cos/sin take radians
       const r_to_rad = Math.PI / 180;
       
       const x1 = Math.cos(a1 * r_to_rad); const y1 = Math.sin(a1 * r_to_rad);

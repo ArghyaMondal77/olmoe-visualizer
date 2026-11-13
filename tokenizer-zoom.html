@@ -2,33 +2,49 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Micro-Architecture: Tokenizer</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <title>Micro-Architecture: Tokenizer // OLMoE</title>
+  
+  <!-- Premium Technical Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-      --machine-bg: #121214;
-      --machine-border: #2a2a35;
-      --glass-bg: rgba(5, 5, 8, 0.85);
-      --glass-border: #222230;
-      --glow-cyan: #00f0ff;
-      --glow-green: #00ff66;
-      --text-main: #e2e8f0;
+      --bg-void: #06070a;
+      --machine-bg: #0d0f15;
+      --machine-surface: #12151f;
+      --machine-border: rgba(255, 255, 255, 0.08);
+      --glass-bg: rgba(7, 9, 13, 0.85);
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --glow-cyan: #38bdf8;
+      --glow-green: #10b981;
+      --text-main: #f1f5f9;
       --text-dim: #64748b;
+      --text-muted: #94a3b8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'JetBrains Mono', monospace;
-      background: var(--bg-gradient);
+      background-color: var(--bg-void);
       color: var(--text-main);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px 20px;
+      padding: 24px 16px 60px;
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-bottom: max(40px, calc(20px + env(safe-area-inset-bottom)));
+      overflow-x: hidden;
+      
+      background-image: 
+        radial-gradient(circle at 50% 15%, rgba(56, 189, 248, 0.05) 0%, transparent 60%),
+        linear-gradient(to right, rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
     }
 
     /* NAVIGATION */
@@ -38,69 +54,80 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 30px;
+      margin-bottom: 24px;
+      gap: 12px;
     }
 
     .btn-back {
-      background: rgba(18, 18, 20, 0.9);
+      background: rgba(18, 21, 31, 0.9);
       color: var(--text-main);
       border: 1px solid var(--machine-border);
       padding: 8px 16px;
       border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: all 0.25s ease;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+      box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.06);
     }
     .btn-back:hover {
       border-color: var(--glow-cyan);
-      color: var(--glow-cyan);
-      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.25);
     }
 
     .page-title {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      letter-spacing: 3px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(0.7rem, 2.8vw, 0.85rem);
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
+      font-weight: 600;
+      text-align: right;
     }
 
     /* MAIN CONTAINER */
     .container {
       width: 100%;
       max-width: 900px;
-      background: var(--machine-bg);
-      border: 2px solid var(--machine-border);
+      background: linear-gradient(180deg, rgba(20, 24, 33, 0.92) 0%, rgba(12, 14, 20, 0.97) 100%);
+      border: 1px solid var(--machine-border);
       border-radius: 12px;
-      padding: 40px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 2px 10px rgba(255,255,255,0.05);
+      padding: clamp(20px, 5vw, 38px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 0 rgba(255,255,255,0.08);
       display: flex;
       flex-direction: column;
-      gap: 40px;
+      gap: clamp(24px, 5vw, 36px);
+      backdrop-filter: blur(12px);
     }
 
     /* SECTION 1: ANIMATED EXAMPLE */
     .section-title {
-      font-size: 1.2rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(0.95rem, 3.5vw, 1.15rem);
+      font-weight: 600;
       color: var(--glow-cyan);
-      margin-bottom: 15px;
-      border-bottom: 1px solid #334;
-      padding-bottom: 10px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--machine-border);
+      padding-bottom: 8px;
       display: flex;
       align-items: center;
       gap: 10px;
+      letter-spacing: 0.02em;
     }
 
     .glass-panel {
       background: var(--glass-bg);
       border: 1px solid var(--glass-border);
       border-radius: 8px;
-      padding: 30px;
+      padding: clamp(20px, 4vw, 30px);
       position: relative;
       overflow: hidden;
-      box-shadow: inset 0 5px 20px rgba(0,0,0,0.8);
+      box-shadow: inset 0 3px 15px rgba(0,0,0,0.85);
     }
 
     .animation-stage {
@@ -108,23 +135,31 @@
       flex-direction: column;
       align-items: center;
       gap: 20px;
-      min-height: 180px;
+      min-height: 160px;
       justify-content: center;
+      width: 100%;
     }
 
     .raw-word {
-      font-size: 1.5rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.15rem, 4.5vw, 1.55rem);
+      font-weight: 600;
       color: #fff;
-      letter-spacing: 2px;
-      transition: all 0.5s;
+      letter-spacing: 0.05em;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: center;
+      word-break: break-word;
     }
 
     .subwords-container {
       display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 10px;
       opacity: 0;
-      transform: translateY(20px);
-      transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+      transform: translateY(16px);
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      width: 100%;
     }
 
     .subwords-container.visible {
@@ -133,81 +168,123 @@
     }
 
     .subword-block {
-      background: #1e1e24;
+      background: #141822;
       border: 1px solid var(--glow-cyan);
       border-radius: 6px;
-      padding: 10px 15px;
+      padding: 8px 14px;
       text-align: center;
-      box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.18), inset 0 1px 0 rgba(255,255,255,0.1);
+      flex: 1 1 auto;
+      min-width: 90px;
+      max-width: 140px;
     }
 
-    .subword-text { font-size: 1.1rem; color: #fff; font-weight: 700; margin-bottom: 5px; }
-    .subword-id { font-size: 0.75rem; color: var(--glow-cyan); }
+    .subword-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(0.95rem, 3.5vw, 1.1rem);
+      color: #fff;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .subword-id { font-size: 0.72rem; color: var(--glow-cyan); }
     .space-char { color: #64748b; font-weight: normal; }
 
     /* SECTION 2: CONCEPTUAL EXPLANATION */
     .concept-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 20px;
+      gap: 16px;
     }
-    @media (min-width: 768px) {
+    @media (min-width: 700px) {
       .concept-grid { grid-template-columns: 1fr 1fr; }
     }
 
     .info-card {
       background: rgba(255, 255, 255, 0.02);
-      border: 1px solid #2a2a35;
-      padding: 20px;
+      border: 1px solid var(--machine-border);
+      padding: 16px;
       border-radius: 8px;
     }
-    .info-card h4 { color: #fff; margin-bottom: 10px; font-size: 0.95rem; }
-    .info-card p { color: #94a3b8; font-size: 0.85rem; line-height: 1.6; }
-    .info-card span.highlight { color: var(--glow-green); }
+    .info-card h4 {
+      font-family: 'Space Grotesk', sans-serif;
+      color: #fff;
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+    .info-card p {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+    .info-card span.highlight { color: var(--glow-green); font-weight: 600; }
 
     /* SECTION 3: OLMOE SPECS BENTO GRID */
     .bento-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
+      gap: 12px;
     }
-    @media (min-width: 768px) {
+    @media (min-width: 680px) {
       .bento-grid { grid-template-columns: repeat(4, 1fr); }
     }
 
     .bento-box {
-      background: #0a0a0d;
-      border: 1px solid #334;
+      background: #080a0e;
+      border: 1px solid var(--machine-border);
       border-radius: 8px;
-      padding: 15px;
+      padding: 14px 12px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      transition: all 0.3s;
+      transition: all 0.25s ease;
+      min-width: 0;
     }
     .bento-box:hover {
       border-color: var(--glow-cyan);
-      background: rgba(0, 240, 255, 0.05);
+      background: rgba(56, 189, 248, 0.05);
+      transform: translateY(-2px);
     }
 
-    .bento-label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    .bento-value { font-size: 1.2rem; color: #fff; font-weight: 700; }
+    .bento-label {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .bento-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(0.95rem, 3.2vw, 1.15rem);
+      color: #fff;
+      font-weight: 700;
+      word-break: break-word;
+    }
     .bento-value.green { color: var(--glow-green); }
 
     .replay-btn {
-      margin-top: 20px;
-      background: transparent;
-      border: 1px solid #445;
-      color: var(--text-dim);
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-family: inherit;
-      font-size: 0.7rem;
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--machine-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 600;
       cursor: pointer;
       text-transform: uppercase;
+      letter-spacing: 0.06em;
+      transition: all 0.25s ease;
     }
-    .replay-btn:hover { border-color: #fff; color: #fff; }
-
+    .replay-btn:hover {
+      border-color: #fff;
+      color: #fff;
+      background: rgba(255,255,255,0.06);
+    }
   </style>
 </head>
 <body>
@@ -215,7 +292,7 @@
   <!-- NAVIGATION -->
   <div class="nav-bar">
     <button class="btn-back" onclick="window.close()">← Close Zoom</button>
-    <div class="page-title">Micro-Architecture: Tokenizer</div>
+    <div class="page-title">Tokenizer // BPE Specs</div>
   </div>
 
   <!-- MAIN CONTENT -->
@@ -224,7 +301,7 @@
     <!-- 1. VISUAL EXAMPLE -->
     <div>
       <div class="section-title">
-        <div style="width: 8px; height: 8px; background: var(--glow-cyan); border-radius: 50%; box-shadow: 0 0 10px var(--glow-cyan);"></div>
+        <div style="width: 7px; height: 7px; background: var(--glow-cyan); border-radius: 50%; box-shadow: 0 0 8px var(--glow-cyan);"></div>
         BPE Subword Fracturing
       </div>
       <div class="glass-panel">
@@ -252,7 +329,7 @@
     <!-- 2. CONCEPTUAL EXPLANATION -->
     <div>
       <div class="section-title">
-        <div style="width: 8px; height: 8px; background: var(--glow-green); border-radius: 50%; box-shadow: 0 0 10px var(--glow-green);"></div>
+        <div style="width: 7px; height: 7px; background: var(--glow-green); border-radius: 50%; box-shadow: 0 0 8px var(--glow-green);"></div>
         How Byte-Pair Encoding Works
       </div>
       <div class="concept-grid">
@@ -277,7 +354,7 @@
 
     <!-- 3. OLMOE SPECS -->
     <div>
-      <div class="section-title" style="color: #fff; border-bottom-color: #445;">
+      <div class="section-title" style="color: #fff; border-bottom-color: var(--machine-border);">
         OLMoE-1B-7B Specific Characteristics
       </div>
       <div class="bento-grid">
@@ -315,7 +392,7 @@
       // Sequence
       setTimeout(() => {
         rawWord.style.opacity = '0';
-        rawWord.style.transform = 'scale(0.8)';
+        rawWord.style.transform = 'scale(0.85)';
       }, 800);
 
       setTimeout(() => {
