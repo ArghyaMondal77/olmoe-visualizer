@@ -10,7 +10,7 @@ This project goes beyond high-level flowcharts. It uses \*\*real tensor telemetr
 
 
 
-🔗 \*\*\[Live Demo on Vercel]\*\* \*(Insert your Vercel link here once deployed)\*
+🔗 \*\*\[Live Demo on Vercel]\*\* \*(https://olmoe-visualizer.vercel.app)\*
 
 
 
@@ -108,9 +108,8 @@ The project is split into a \*\*Macro Topology\*\* pipeline and 6 \*\*Micro-Math
 
 
 
-\## 🛠️ Deployment link 
 
 
 
-https://olmoe-visualizer.vercel.app
+
 
